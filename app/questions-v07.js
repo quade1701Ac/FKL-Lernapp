@@ -6,5 +6,6 @@ import { qualityQuestions } from './questions-quality';
 import { v11Questions } from './questions-v11';
 import { replacementLf5to12Questions } from './questions-replacement-lf5-12';
 import { expansionV12Questions } from './questions-expansion-v12';
+import { qualityReplacementQuestions } from './question-quality-filter';
 
-export const v07Questions = [...v08Questions, ...v09Questions, ...qualityQuestions, ...v11Questions, ...replacementLf5to12Questions, ...expansionV12Questions];
+export const v07Questions = [...v08Questions, ...v09Questions, ...qualityQuestions, ...v11Questions, ...replacementLf5to12Questions, ...expansionV12Questions, ...qualityReplacementQuestions];
