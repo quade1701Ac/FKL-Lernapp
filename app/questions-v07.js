@@ -8,5 +8,6 @@ import { replacementLf5to12Questions } from './questions-replacement-lf5-12';
 import { expansionV12Questions } from './questions-expansion-v12';
 import { qualityReplacementQuestions } from './question-quality-filter';
 import { qualityLf9to12Questions } from './questions-quality-lf9-12';
+import { v10Batch1Questions } from './questions-v10-batch1';
 
-export const v07Questions = [...v08Questions, ...v09Questions, ...qualityQuestions, ...v11Questions, ...replacementLf5to12Questions, ...expansionV12Questions, ...qualityReplacementQuestions, ...qualityLf9to12Questions];
+export const v07Questions = [...v08Questions, ...v09Questions, ...qualityQuestions, ...v11Questions, ...replacementLf5to12Questions, ...expansionV12Questions, ...qualityReplacementQuestions, ...qualityLf9to12Questions, ...v10Batch1Questions];
