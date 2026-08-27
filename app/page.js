@@ -1,0 +1,127 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { learningFields, questions, scoreAnswer, createCalculationQuestions } from './data';
+
+const MODES = [
+  { id:'learn', label:'Lernen', icon:'🧠', desc:'Mit Lösung und direktem Feedback' },
+  { id:'cards', label:'Lernkarten', icon:'🗂️', desc:'Frage denken, Lösung aufdecken' },
+  { id:'test', label:'Test', icon:'✍️', desc:'Freitext und Rechenaufgaben trainieren' },
+  { id:'weak', label:'Schwachstellen', icon:'🎯', desc:'Das üben, was noch nicht sitzt' },
+  { id:'exam', label:'Prüfung', icon:'⏱️', desc:'12 gemischte Aufgaben am Stück' },
+];
+const STATS_KEY='lagerlogik-v03-stats';
+const REVIEW_KEY='lagerlogik-v03-review';
+
+function load(key, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function shuffle(arr){ return [...arr].sort(()=>Math.random()-.5); }
+function qKey(q){ return q.id.split('-').slice(0,2).join('-'); }
+
+export default function Home() {
+  const [view,setView]=useState('home');
+  const [mode,setMode]=useState('learn');
+  const [selectedField,setSelectedField]=useState(1);
+  const [selectedTopic,setSelectedTopic]=useState('Alle Themen');
+  const [index,setIndex]=useState(0);
+  const [answer,setAnswer]=useState('');
+  const [result,setResult]=useState(null);
+  const [revealed,setRevealed]=useState(false);
+  const [stats,setStats]=useState({});
+  const [reviews,setReviews]=useState({});
+  const [sessionQuestions,setSessionQuestions]=useState([]);
+  const [sessionResults,setSessionResults]=useState([]);
+  const [calcQuestions,setCalcQuestions]=useState([]);
+
+  useEffect(()=>{
+    const old=load('lagerlogik-v02-stats',{});
+    setStats(load(STATS_KEY,old));
+    setReviews(load(REVIEW_KEY,{}));
+    setCalcQuestions(createCalculationQuestions(Date.now()));
+  },[]);
+
+  const allQuestions=useMemo(()=>[...questions,...calcQuestions],[calcQuestions]);
+  const field=learningFields.find(f=>f.id===selectedField);
+  const filtered=useMemo(()=>allQuestions.filter(q=>q.field===selectedField&&(selectedTopic==='Alle Themen'||q.topic===selectedTopic)),[allQuestions,selectedField,selectedTopic]);
+  const current=sessionQuestions[index];
+
+  const totalAnswered=Object.values(stats).reduce((n,s)=>n+(s.answered||0),0);
+  const totalPoints=Object.values(stats).reduce((n,s)=>n+(s.points||0),0);
+  const overall=totalAnswered?Math.round(totalPoints/totalAnswered):0;
+  const weakFields=learningFields.map(f=>({field:f,avg:fieldAverage(f.id),answered:stats[f.id]?.answered||0})).filter(x=>x.answered).sort((a,b)=>a.avg-b.avg);
+  const dueCount=Object.values(reviews).filter(r=>!r.next||r.next<=Date.now()).length;
+
+  function persistStats(next){setStats(next);localStorage.setItem(STATS_KEY,JSON.stringify(next));}
+  function persistReviews(next){setReviews(next);localStorage.setItem(REVIEW_KEY,JSON.stringify(next));}
+  function fieldAverage(id){const s=stats[id];return s?.answered?Math.round(s.points/s.answered):0;}
+  function topicAverage(fieldId,topic){const s=stats[fieldId]?.topics?.[topic];return s?.answered?Math.round(s.points/s.answered):0;}
+
+  function record(q,score){
+    const prev=stats[q.field]||{answered:0,points:0,correct:0,topics:{}};
+    const tp=prev.topics?.[q.topic]||{answered:0,points:0};
+    persistStats({...stats,[q.field]:{...prev,answered:prev.answered+1,points:prev.points+score,correct:(prev.correct||0)+(score>=60?1:0),topics:{...(prev.topics||{}),[q.topic]:{answered:tp.answered+1,points:tp.points+score}}}});
+    scheduleReview(q,score);
+  }
+  function scheduleReview(q,score){
+    const key=qKey(q),prev=reviews[key]||{box:0};
+    const nextBox=score>=80?Math.min(5,(prev.box||0)+1):score>=60?Math.max(1,prev.box||1):0;
+    const days=[0,1,3,7,14,30][nextBox];
+    const next=Date.now()+days*86400000;
+    persistReviews({...reviews,[key]:{box:nextBox,lastScore:score,next}});
+  }
+  function resetSession(qs,newMode){setSessionQuestions(qs);setSessionResults([]);setMode(newMode);setIndex(0);setAnswer('');setResult(null);setRevealed(false);setView('session');}
+  function start(fieldId,newMode='learn'){
+    setSelectedField(fieldId);setSelectedTopic('Alle Themen');
+    const qs=allQuestions.filter(q=>q.field===fieldId);
+    resetSession(qs,newMode);
+  }
+  function changeTopic(topic){
+    setSelectedTopic(topic);
+    setSessionQuestions(allQuestions.filter(q=>q.field===selectedField&&(topic==='Alle Themen'||q.topic===topic)));
+    setIndex(0);setAnswer('');setResult(null);setRevealed(false);
+  }
+  function changeMode(newMode){
+    if(newMode==='weak'){startWeakness();return;}
+    setMode(newMode);setIndex(0);setAnswer('');setResult(null);setRevealed(false);
+  }
+  function startExam(){resetSession(shuffle(allQuestions).slice(0,Math.min(12,allQuestions.length)),'exam');}
+  function startWeakness(){
+    const weighted=allQuestions.map(q=>{
+      const r=reviews[qKey(q)];
+      const fAvg=fieldAverage(q.field);
+      let weight=!stats[q.field]?4:Math.max(1,6-Math.floor(fAvg/20));
+      if(r&&(!r.next||r.next<=Date.now())) weight+=5;
+      if(r?.lastScore<60) weight+=5;
+      return {q,weight};
+    });
+    const bag=[];weighted.forEach(x=>{for(let i=0;i<x.weight;i++)bag.push(x.q)});
+    const picked=[];while(bag.length&&picked.length<12){const q=bag[Math.floor(Math.random()*bag.length)];if(!picked.some(p=>qKey(p)===qKey(q)))picked.push(q);if(picked.length>=allQuestions.length)break;}
+    resetSession(picked.length?picked:shuffle(allQuestions).slice(0,12),'weak');
+  }
+  function check(){if(!current)return;const scored=scoreAnswer(answer,current);setResult(scored);record(current,scored.score);setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score:scored.score}]);}
+  function next(){if(index+1>=sessionQuestions.length){setView(mode==='exam'?'examResult':'sessionResult');}else{setIndex(i=>i+1);setAnswer('');setResult(null);setRevealed(false);}}
+  function rateCard(score){record(current,score);setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score}]);next();}
+  function resetProgress(){if(!confirm('Wirklich den gesamten Lernfortschritt löschen?'))return;localStorage.removeItem(STATS_KEY);localStorage.removeItem(REVIEW_KEY);localStorage.removeItem('lagerlogik-v02-stats');setStats({});setReviews({});}
+
+  if(view==='examResult'||view==='sessionResult'){
+    const avg=sessionResults.length?Math.round(sessionResults.reduce((n,r)=>n+r.score,0)/sessionResults.length):0;
+    const byField={};sessionResults.forEach(r=>{byField[r.field]=byField[r.field]||[];byField[r.field].push(r.score)});
+    return <main><Topbar onHome={()=>setView('home')}/><section className="resultHero card"><span className="kicker">{view==='examResult'?'Prüfung beendet':'Training beendet'}</span><h1>{avg}%</h1><p>{avg>=80?'Sehr stark. Die Palette steht sauber im Regal. 🎯':avg>=60?'Solide Basis. Ein paar Stellen brauchen noch Wiederholung.':'Hier liegen noch einige Wissenskartons quer im Gang.'}</p><div className="resultBreakdown">{Object.entries(byField).map(([id,vals])=><div key={id}><span>LF {id}</span><strong>{Math.round(vals.reduce((a,b)=>a+b,0)/vals.length)}%</strong></div>)}</div><div className="actions"><button className="primary" onClick={view==='examResult'?startExam:startWeakness}>{view==='examResult'?'Neue Prüfung':'Schwachstellen üben'}</button><button className="secondary" onClick={()=>setView('home')}>Zur Übersicht</button></div></section></main>;
+  }
+
+  if(view==='session'&&current){
+    const progress=Math.round(((index+1)/Math.max(1,sessionQuestions.length))*100);
+    return <main><Topbar onHome={()=>setView('home')}/><div className="sessionLayout"><aside className="card sessionSide"><button className="back" onClick={()=>setView('home')}>← Übersicht</button><div className="fieldIcon">{mode==='exam'||mode==='weak'?'🎯':field?.icon||'📦'}</div><h2>{mode==='exam'?'Prüfungssimulation':mode==='weak'?'Schwachstellen-Training':`Lernfeld ${selectedField}`}</h2><p>{mode==='exam'?'Gemischte Aufgaben aus allen Lernfeldern':mode==='weak'?'Fällige und bisher schwächere Themen werden bevorzugt':field?.title}</p>{!['exam','weak'].includes(mode)&&<><label>Thema</label><select value={selectedTopic} onChange={e=>changeTopic(e.target.value)}><option>Alle Themen</option>{field.topics.map(t=><option key={t}>{t}</option>)}</select></>} {!['exam','weak'].includes(mode)&&<div className="modePills">{MODES.filter(m=>['learn','cards','test'].includes(m.id)).map(m=><button key={m.id} className={mode===m.id?'pill active':'pill'} onClick={()=>changeMode(m.id)}>{m.icon} {m.label}</button>)}</div>}</aside>
+    <section className="card questionCard"><div className="questionMeta"><span>{['exam','weak'].includes(mode)?`Frage ${index+1} von ${sessionQuestions.length}`:`${current.topic} · Schwierigkeit ${'●'.repeat(current.difficulty)}`}</span><strong>{progress}%</strong></div><div className="progress"><i style={{width:`${progress}%`}}/></div><div className="typeBadge">{current.type==='number'?'🧮 Rechenaufgabe':'✍️ Freitext'}</div><h1>{current.question}</h1>
+    {mode==='cards'?<div className="flashArea">{!revealed?<button className="reveal" onClick={()=>setRevealed(true)}>Lösung aufdecken</button>:<div className="solution"><span>Musterlösung</span><p>{current.solution}</p><div className="actions"><button className="badBtn" onClick={()=>rateCard(30)}>Noch unsicher</button><button className="goodBtn" onClick={()=>rateCard(100)}>Gewusst ✓</button></div></div>}</div>:<><textarea inputMode={current.type==='number'?'decimal':'text'} value={answer} onChange={e=>setAnswer(e.target.value)} placeholder={current.type==='number'?'Ergebnis eingeben, z. B. 125 oder 12,5 …':'Antworte in eigenen Worten …'} disabled={!!result}/>{!result?<button className="primary" disabled={!answer.trim()} onClick={check}>Antwort prüfen</button>:<div className={result.score>=60?'feedback good':'feedback bad'}><div className="scoreline"><strong>{result.score}%</strong><span>{result.score>=80?'Sehr gut':result.score>=60?'Fast richtig':'Noch nicht ganz'}</span></div>{!result.numeric&&<p><b>Erkannte Begriffe:</b> {result.hits.length?result.hits.join(', '):'keine'}</p>}<div className="solution"><span>Musterlösung</span><p>{current.solution}</p></div><button className="primary" onClick={next}>{index+1>=sessionQuestions.length?'Training auswerten':'Nächste Frage'}</button></div>}</>}</section></div></main>;
+  }
+
+  return <main><Topbar/><section className="hero"><div><span className="kicker">Fachkraft für Lagerlogistik</span><h1>Dein Lager.<br/>Dein Wissen.</h1><p>Jetzt mit adaptivem Training, Wiederholungslogik und dynamischen Rechenaufgaben. 📦</p></div><div className="heroStats card"><div><strong>{overall}%</strong><span>Gesamt</span></div><div><strong>{totalAnswered}</strong><span>Antworten</span></div><div><strong>{dueCount}</strong><span>fällig</span></div></div></section>
+  <section className="modeGrid v03">{MODES.map(m=><button key={m.id} className="modeCard card" onClick={()=>m.id==='exam'?startExam():m.id==='weak'?startWeakness():start(1,m.id)}><span>{m.icon}</span><div><strong>{m.label}</strong><small>{m.desc}</small></div></button>)}</section>
+  {weakFields.length>0&&<section className="card dashboard"><div><span className="kicker">Adaptive Analyse</span><h2>Deine aktuellen Baustellen</h2></div><div className="weakList">{weakFields.slice(0,3).map(x=><button key={x.field.id} onClick={()=>start(x.field.id,'test')}><span>{x.field.icon} LF {x.field.id}</span><b>{x.avg}%</b><small>{x.field.title}</small></button>)}</div><button className="primary" onClick={startWeakness}>🎯 Schwachstellen automatisch trainieren</button></section>}
+  <div className="sectionTitle"><div><span className="kicker">Übersicht</span><h2>12 Lernfelder</h2></div><button className="textButton" onClick={resetProgress}>Fortschritt zurücksetzen</button></div><section className="fieldGrid">{learningFields.map(f=>{const s=stats[f.id],avg=fieldAverage(f.id),count=allQuestions.filter(q=>q.field===f.id).length;return <button className="fieldCard card" key={f.id} onClick={()=>start(f.id,'learn')}><div className="fieldTop"><span className="fieldIcon small">{f.icon}</span><span className="fieldNo">LF {f.id}</span></div><h3>{f.title}</h3><p>{f.topics.map(t=>`${t}${stats[f.id]?.topics?.[t]?.answered?` ${topicAverage(f.id,t)}%`:''}`).join(' · ')}</p><div className="fieldFooter"><span>{count} Aufgaben</span><strong className={avg>=80?'greenText':avg>=60?'amberText':''}>{s?`${avg}%`:'Start'}</strong></div></button>})}</section></main>;
+}
+
+function Topbar({onHome}){return <header className="topbar"><button className="brand" onClick={onHome}><span>▣</span> LagerLogik <em>0.3</em></button><div className="topRight"><span className="statusDot"/> lokal gespeichert</div></header>}
