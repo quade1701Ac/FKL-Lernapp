@@ -14,12 +14,12 @@ const GROUPS = [
   ['kosten','aufwand','mehrkosten'],
   ['qualität','beschaffenheit','zustand','art'],
   ['lieferzeit','laufzeit'],
-  ['termintreue','pünktlich','pünktlichkeit'],
+  ['termintreue','pünktlich','pünktlichkeit','verspätung','verspaetung','verzögerung','verzoegerung','zu spät','zu spaet'],
   ['bestand','lagerbestand','vorrat'],
   ['kapitalbindung','kapital','gebunden'],
   ['schnell','kurz','verkürzen','reduzieren','senken'],
   ['weg','wege','laufweg','fahrweg'],
-  ['verwechslung','falschlieferung','falscher artikel'],
+  ['verwechslung','falschlieferung','falscher artikel','fehlleitung','falsche adresse','falsch zugeordnet','falsche zuordnung'],
   ['kennzeichnung','etikett','label','barcode'],
   ['tracking','sendungsverfolgung','nachverfolgung','verfolgen','verfolgt','verfolgbar','verfolgbarkeit'],
   ['status','sendungsstatus','übersicht','transparenz'],
@@ -29,6 +29,7 @@ const GROUPS = [
   ['fehler','fehlerquote','abweichung','differenz'],
   ['effizienz','wirtschaftlich','wirtschaftlichkeit','produktivität'],
   ['zeit','dauer','laufzeit','wartezeit'],
+  ['verlust','verloren','verschwunden','abhanden'],
 ];
 
 const CONTEXT_ONLY = new Set(['fahrer','kunde','zustellung','status']);
@@ -65,10 +66,25 @@ function semanticOverlap(answer,solution){
   return count;
 }
 function isComparisonQuestion(q){const x=norm(q?.question||'');return x.includes('unterschied')||x.includes('unterscheid')||x.includes('gegenuber')||x.includes('im vergleich')}
-function requestedAspects(q){
+function explicitRequestedCount(q){
   const x=norm(q?.question||'');
-  const numberWords={eins:1,einen:1,eine:1,zwei:2,drei:3,vier:4,fuenf:5,'fünf':5,sechs:6};
-  for(const [word,n] of Object.entries(numberWords)) if(new RegExp(`\\b${word}\\b`).test(x)) return n;
+  const numberWords={eins:1,einen:1,eine:1,zwei:2,drei:3,vier:4,funf:5,fuenf:5,sechs:6};
+  const numberPattern='(eins|einen|eine|zwei|drei|vier|funf|fuenf|sechs|[1-6])';
+  const patterns=[
+    new RegExp(`\\b(?:nenne|nenn|gib|beschreibe|erlaeutere|erklare|erklaere|zeige|formuliere)\\s+(?:je\\s+)?${numberPattern}\\b`),
+    new RegExp(`\\b${numberPattern}\\s+(?:mogliche\\s+|moegliche\\s+)?(?:folgen|grunde|gruende|ursachen|vorteile|nachteile|massnahmen|maßnahmen|kriterien|schritte|beispiele|ziele|risiken|punkte|faktoren|anforderungen|kostenarten|fehler)\\b`),
+  ];
+  for(const pattern of patterns){
+    const match=x.match(pattern);if(!match)continue;
+    const raw=match[1];
+    if(/^\d$/.test(raw))return Number(raw);
+    return numberWords[raw]||null;
+  }
+  return null;
+}
+function requestedAspects(q){
+  const explicit=explicitRequestedCount(q);
+  if(explicit)return explicit;
   if(isComparisonQuestion(q)) return 2;
   if(q?.minHits) return Math.max(1,q.minHits);
   const concepts=new Set((q?.keywords||[]).map(conceptKey)).size;
@@ -76,15 +92,16 @@ function requestedAspects(q){
 }
 function creditHits(hits){return hits.filter(h=>!CONTEXT_ONLY.has(conceptKey(h)))}
 function roundScore(n){return Math.max(0,Math.min(100,Math.round(n/10)*10))}
-function looksLikeKeywordDump(raw,contentWords,usefulHits){
+function looksLikeKeywordDump(raw,contentWords,usefulHits,q){
+  // Wenn ausdrücklich mehrere Punkte/Beispiele verlangt werden, ist eine knappe Aufzählung
+  // eine völlig legitime Prüfungsantwort und darf nicht als Keyword-Spam bestraft werden.
+  if(explicitRequestedCount(q))return false;
   const separators=(String(raw).match(KEYWORD_DUMP_SEPARATORS)||[]).length;
   const hasSentenceSignal=/[.!?]|\b(weil|damit|deshalb|dadurch|anschließend|zuerst|danach|wenn|um)\b/i.test(String(raw));
   return usefulHits>=2&&contentWords<=Math.max(4,usefulHits+1)&&separators>=usefulHits-1&&!hasSentenceSignal;
 }
 function hasSuspiciousNegation(answer,q,hits){
   const a=norm(answer);if(!NEGATION.test(a)||!hits.length)return false;
-  // Negation directly around a credited concept is suspicious. This prevents answers such as
-  // „Schaden nicht dokumentieren“ from earning points merely for containing both keywords.
   return hits.some(k=>relatedTerms(k).some(t=>{
     const idx=a.indexOf(t);if(idx<0)return false;
     const left=a.slice(Math.max(0,idx-28),idx),right=a.slice(idx+t.length,idx+t.length+28);
@@ -102,30 +119,23 @@ export function scoreAnswerV07(answer,q,fallback){
   const contentWords=[...new Set(words(answer).map(stem))].length;
   const needed=requestedAspects(q);
 
-  // Fachliche Aspekte zählen, bloße Kontextwörter nicht.
   let aspects=usefulHits.length;
-
-  // Sinngemäße Antworten dürfen genau einen zusätzlichen Aspekt erhalten. Das greift erst bei
-  // ausreichend zusammenhängendem Inhalt, nicht bei zufälliger Wortüberschneidung.
   if(contentWords>=6&&overlap>=4&&aspects<needed) aspects++;
 
   let score=aspects>0?roundScore((Math.min(aspects,needed)/needed)*100):0;
 
-  // Vollpunktzahl verlangt eine erkennbare Erklärung statt einer bloßen Stichwortwolke.
-  if(score===100&&needed>=2&&contentWords<5) score=80;
-  if(looksLikeKeywordDump(answer,contentWords,usefulHits)) score=Math.min(score,50);
+  // Bei ausdrücklichen Aufzählungsfragen zählt fachlich korrekte Kürze. Bei Erklärfragen
+  // bleibt die Hürde gegen bloßes Aneinanderreihen von Schlüsselwörtern bestehen.
+  if(score===100&&needed>=2&&contentWords<5&&!explicitRequestedCount(q)) score=80;
+  if(looksLikeKeywordDump(answer,contentWords,usefulHits,q)) score=Math.min(score,50);
 
-  // Vergleichsfragen müssen beide Seiten fachlich unterscheiden.
   if(isComparisonQuestion(q)){
     if(usefulHits.length<2||overlap<2||contentWords<5) score=Math.min(score,50);
     if(usefulHits.length>=2&&overlap>=4&&contentWords>=6) score=100;
   }
 
-  // Negierte richtige Begriffe sind kein Wissenstreffer. Bei verdächtiger Negation wird die
-  // automatische Bewertung bewusst streng gedeckelt und die Musterlösung bleibt sichtbar.
   if(hasSuspiciousNegation(answer,q,usefulHits)) score=Math.min(score,20);
 
-  // Inhaltsarme Kurzantworten und reine Kontexttreffer bleiben bei 0 %.
   if(usefulHits.length===0&&overlap<3) score=0;
   if(contentWords<=1) score=0;
 
