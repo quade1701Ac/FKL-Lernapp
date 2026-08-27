@@ -7,6 +7,7 @@ import { v05Questions } from './questions-v05';
 import { v06Questions } from './questions-v06';
 import { v07Questions } from './questions-v07';
 import { scoreAnswerV07, calculationInfo } from './v07-utils';
+import { supabase } from './supabase-client';
 
 const MODES=[
 {id:'learn',label:'Lernen',icon:'🧠',desc:'Mit Lösung und direktem Feedback'},
@@ -19,6 +20,25 @@ function load(k,f){if(typeof window==='undefined')return f;try{return JSON.parse
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
 function qKey(q){return q.id}
 
+async function saveAnswerHistory(q,score,mode,answerText=''){
+ try{
+  const {data:{user}}=await supabase.auth.getUser();
+  if(!user)return;
+  const displayName=user.user_metadata?.display_name||user.email?.split('@')[0]||null;
+  const {error}=await supabase.from('answer_history').insert({
+   user_id:user.id,
+   display_name:displayName,
+   question_id:String(q.id),
+   field:q.field,
+   topic:q.topic,
+   score,
+   mode,
+   answer_text:answerText||null
+  });
+  if(error)console.error('Supabase answer_history:',error.message);
+ }catch(err){console.error('Supabase answer_history:',err)}
+}
+
 export default function Home(){
  const [view,setView]=useState('home'),[mode,setMode]=useState('learn'),[selectedField,setSelectedField]=useState(1),[selectedTopic,setSelectedTopic]=useState('Alle Themen'),[index,setIndex]=useState(0),[answer,setAnswer]=useState(''),[mcAnswer,setMcAnswer]=useState([]),[result,setResult]=useState(null),[revealed,setRevealed]=useState(false),[stats,setStats]=useState({}),[reviews,setReviews]=useState({}),[sessionQuestions,setSessionQuestions]=useState([]),[sessionResults,setSessionResults]=useState([]),[calcQuestions,setCalcQuestions]=useState([]);
  useEffect(()=>{const old=load('lagerlogik-v06-stats',load('lagerlogik-v05-stats',load('lagerlogik-v03-stats',load('lagerlogik-v02-stats',{}))));const oldReviews=load('lagerlogik-v06-review',load('lagerlogik-v05-review',{}));setStats(load(STATS_KEY,old));setReviews(load(REVIEW_KEY,oldReviews));setCalcQuestions(createCalculationQuestions(Date.now()))},[]);
@@ -30,7 +50,7 @@ export default function Home(){
  const weakFields=learningFields.map(f=>({field:f,avg:fieldAverage(f.id),answered:stats[f.id]?.answered||0})).filter(x=>x.answered).sort((a,b)=>a.avg-b.avg);
  const dueCount=Object.values(reviews).filter(r=>!r.next||r.next<=Date.now()).length;
  function persistStats(n){setStats(n);localStorage.setItem(STATS_KEY,JSON.stringify(n))} function persistReviews(n){setReviews(n);localStorage.setItem(REVIEW_KEY,JSON.stringify(n))}
- function record(q,score){const p=stats[q.field]||{answered:0,points:0,correct:0,topics:{}},tp=p.topics?.[q.topic]||{answered:0,points:0};persistStats({...stats,[q.field]:{...p,answered:p.answered+1,points:p.points+score,correct:(p.correct||0)+(score>=60?1:0),topics:{...(p.topics||{}),[q.topic]:{answered:tp.answered+1,points:tp.points+score}}}});scheduleReview(q,score)}
+ function record(q,score,answerText=''){const p=stats[q.field]||{answered:0,points:0,correct:0,topics:{}},tp=p.topics?.[q.topic]||{answered:0,points:0};persistStats({...stats,[q.field]:{...p,answered:p.answered+1,points:p.points+score,correct:(p.correct||0)+(score>=60?1:0),topics:{...(p.topics||{}),[q.topic]:{answered:tp.answered+1,points:tp.points+score}}}});scheduleReview(q,score);void saveAnswerHistory(q,score,mode,answerText)}
  function scheduleReview(q,score){const k=qKey(q),p=reviews[k]||{box:0},box=score>=80?Math.min(5,(p.box||0)+1):score>=60?Math.max(1,p.box||1):0,days=[0,1,3,7,14,30][box];persistReviews({...reviews,[k]:{box,lastScore:score,next:Date.now()+days*86400000}})}
  function clearAnswer(){setAnswer('');setMcAnswer([]);setResult(null);setRevealed(false)}
  function resetSession(qs,m){setSessionQuestions(shuffle(qs));setSessionResults([]);setMode(m);setIndex(0);clearAnswer();setView('session')}
@@ -40,9 +60,9 @@ export default function Home(){
  function startExam(){resetSession(shuffle(allQuestions).slice(0,Math.min(12,allQuestions.length)),'exam')}
  function startWeakness(){const weighted=allQuestions.map(q=>{const r=reviews[qKey(q)],avg=fieldAverage(q.field);let w=!stats[q.field]?4:Math.max(1,6-Math.floor(avg/20));if(r&&(!r.next||r.next<=Date.now()))w+=5;if(r?.lastScore<60)w+=5;return{q,w}}),bag=[];weighted.forEach(x=>{for(let i=0;i<x.w;i++)bag.push(x.q)});const picked=[];while(bag.length&&picked.length<12){const q=bag[Math.floor(Math.random()*bag.length)];if(!picked.some(p=>p.id===q.id))picked.push(q);if(picked.length>=allQuestions.length)break}resetSession(picked.length?picked:shuffle(allQuestions).slice(0,12),'weak')}
  function scoreMc(q){const chosen=[...mcAnswer].sort((a,b)=>a-b),correct=[...q.correct].sort((a,b)=>a-b),right=chosen.filter(x=>correct.includes(x)).length,wrong=chosen.filter(x=>!correct.includes(x)).length,missed=correct.filter(x=>!chosen.includes(x)).length;let score=Math.round(Math.max(0,(right-wrong)/(correct.length||1))*100);if(!wrong&&missed===0)score=100;return{score,hits:[],mc:true,chosen,correct}}
- function check(){if(!current)return;const scored=current.type==='mc'?scoreMc(current):scoreAnswerV07(answer,current,scoreAnswer);setResult(scored);record(current,scored.score);setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score:scored.score}])}
+ function check(){if(!current)return;const scored=current.type==='mc'?scoreMc(current):scoreAnswerV07(answer,current,scoreAnswer);const savedAnswer=current.type==='mc'?mcAnswer.map(i=>current.options[i]).join(' | '):answer;setResult(scored);record(current,scored.score,savedAnswer);setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score:scored.score}])}
  function next(){if(index+1>=sessionQuestions.length)setView(mode==='exam'?'examResult':'sessionResult');else{setIndex(i=>i+1);clearAnswer()}}
- function rateCard(score){record(current,score);setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score}]);next()}
+ function rateCard(score){record(current,score,score>=80?'Lernkarte: gewusst':'Lernkarte: noch unsicher');setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score}]);next()}
  function toggleMc(i){if(result)return;setMcAnswer(a=>a.includes(i)?a.filter(x=>x!==i):[...a,i])}
  function resetProgress(){if(!confirm('Wirklich den gesamten Lernfortschritt löschen?'))return;[STATS_KEY,REVIEW_KEY,'lagerlogik-v06-stats','lagerlogik-v06-review','lagerlogik-v05-stats','lagerlogik-v05-review','lagerlogik-v03-stats','lagerlogik-v02-stats'].forEach(k=>localStorage.removeItem(k));setStats({});setReviews({})}
  if(view==='examResult'||view==='sessionResult'){const avg=sessionResults.length?Math.round(sessionResults.reduce((n,r)=>n+r.score,0)/sessionResults.length):0,byField={};sessionResults.forEach(r=>{byField[r.field]=byField[r.field]||[];byField[r.field].push(r.score)});return <main><Topbar onHome={()=>setView('home')}/><section className="resultHero card"><span className="kicker">{view==='examResult'?'Prüfung beendet':'Training beendet'}</span><h1>{avg}%</h1><p>{avg>=80?'Sehr stark. 🎯':avg>=60?'Solide Basis. Ein paar Stellen brauchen noch Wiederholung.':'Hier liegen noch einige Wissenskartons quer im Gang.'}</p><div className="resultBreakdown">{Object.entries(byField).map(([id,v])=><div key={id}><span>LF {id}</span><strong>{Math.round(v.reduce((a,b)=>a+b,0)/v.length)}%</strong></div>)}</div><div className="actions"><button className="primary" onClick={view==='examResult'?startExam:startWeakness}>{view==='examResult'?'Neue Prüfung':'Schwachstellen üben'}</button><button className="secondary" onClick={()=>setView('home')}>Zur Übersicht</button></div></section></main>}
@@ -50,4 +70,4 @@ export default function Home(){
  return <main><Topbar/><section className="hero"><div><span className="kicker">Fachkraft für Lagerlogistik</span><h1>Dein Lager.<br/>Dein Wissen.</h1><p>Praxisnahes Training mit Freitext, Multiple Choice, Wiederholungslogik und Rechenaufgaben. 📦</p></div><div className="heroStats card"><div><strong>{overall}%</strong><span>Gesamt</span></div><div><strong>{totalAnswered}</strong><span>Antworten</span></div><div><strong>{dueCount}</strong><span>fällig</span></div></div></section><section className="modeGrid v03">{MODES.map(m=><button key={m.id} className="modeCard card" onClick={()=>m.id==='exam'?startExam():m.id==='weak'?startWeakness():start(1,m.id)}><span>{m.icon}</span><div><strong>{m.label}</strong><small>{m.desc}</small></div></button>)}</section>{weakFields.length>0&&<section className="card dashboard"><div><span className="kicker">Adaptive Analyse</span><h2>Deine aktuellen Baustellen</h2></div><div className="weakList">{weakFields.slice(0,3).map(x=><button key={x.field.id} onClick={()=>start(x.field.id,'test')}><span>{x.field.icon} LF {x.field.id}</span><b>{x.avg}%</b><small>{x.field.title}</small></button>)}</div><button className="primary" onClick={startWeakness}>🎯 Schwachstellen automatisch trainieren</button></section>}<div className="sectionTitle"><div><span className="kicker">Übersicht</span><h2>12 Lernfelder</h2></div><button className="textButton" onClick={resetProgress}>Fortschritt zurücksetzen</button></div><section className="fieldGrid">{learningFields.map(f=>{const s=stats[f.id],avg=fieldAverage(f.id),count=allQuestions.filter(q=>q.field===f.id).length;return <button className="fieldCard card" key={f.id} onClick={()=>start(f.id,'learn')}><div className="fieldTop"><span className="fieldIcon small">{f.icon}</span><span className="fieldNo">LF {f.id}</span></div><h3>{f.title}</h3><p>{f.topics.map(t=>`${t}${stats[f.id]?.topics?.[t]?.answered?` ${topicAverage(f.id,t)}%`:''}`).join(' · ')}</p><div className="fieldFooter"><span>{count} Aufgaben</span><strong className={avg>=80?'greenText':avg>=60?'amberText':''}>{s?`${avg}%`:'Start'}</strong></div></button>})}</section></main>
 }
 function SolutionContent({q}){if(q.type!=='number')return <><span>Musterlösung</span><p>{q.solution}</p></>;const x=calculationInfo(q);return <><span>Formel</span><p><b>{x.formula||'Rechenformel gemäß Aufgabe'}</b></p><span>Einsetzen & Rechenweg</span><p>{x.rechenweg}</p><span>Ergebnis</span><p><b>{x.ergebnis||q.solution}</b></p></>}
-function Topbar({onHome}){return <header className="topbar"><button className="brand" onClick={onHome}><span>▣</span> LagerLogik <em>0.7</em></button><div className="topRight"><span className="statusDot"/> lokal gespeichert</div></header>}
+function Topbar({onHome}){return <header className="topbar"><button className="brand" onClick={onHome}><span>▣</span> LagerLogik <em>0.7</em></button><div className="topRight"><span className="statusDot"/> lokal + Cloud</div></header>}
