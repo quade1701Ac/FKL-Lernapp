@@ -1,5 +1,7 @@
 // Adaptive Fragenauswahl: Schwächen und fällige Wiederholungen werden bevorzugt,
 // gleichzeitig bleibt ein fester Zufallsanteil für neue/abwechslungsreiche Fragen erhalten.
+import { qualityCheckedQuestions } from './question-quality-filter';
+
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
 
 function average(s){return s?.answered?Math.round((s.points||0)/s.answered):null}
@@ -10,7 +12,6 @@ function weightFor(q,reviews,stats){
   const topic=field?.topics?.[q.topic];
   let w=1;
 
-  // Neue Fragen bekommen einen deutlichen Bonus, damit der Pool nicht „festfriert“.
   if(!review) w+=3;
   else {
     const last=Number(review.lastScore);
@@ -46,7 +47,6 @@ function weightFor(q,reviews,stats){
     else if(tAvg>=90) w-=0.25;
   }
 
-  // Schwierigere Aufgaben leicht bevorzugen, ohne leichte Grundlagen zu verdrängen.
   if(q.difficulty>=3) w+=0.5;
   return Math.max(0.35,w);
 }
@@ -63,8 +63,9 @@ function weightedPick(pool,reviews,stats){
 }
 
 export function smartPick(qs,limit,reviews={},stats={},randomShare=.35){
-  // ID-Dopplungen vorsichtshalber entfernen.
-  const unique=[...new Map(qs.map(q=>[String(q.id),q])).values()];
+  // Vor jeder Auswahl werden ausgemusterte Altfragen und echte Text-Dubletten entfernt.
+  const checked=qualityCheckedQuestions(qs);
+  const unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];
   const target=Math.min(limit,unique.length);
   if(target<=0)return [];
 
@@ -82,11 +83,11 @@ export function smartPick(qs,limit,reviews={},stats={},randomShare=.35){
     pool=pool.filter(x=>String(x.id)!==id);
   }
 
-  // Die Gewichtung bestimmt nur die Auswahl, nicht die Reihenfolge der Runde.
   return shuffle(chosen);
 }
 
 export function randomPick(qs,limit){
-  const unique=[...new Map(qs.map(q=>[String(q.id),q])).values()];
+  const checked=qualityCheckedQuestions(qs);
+  const unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];
   return shuffle(unique).slice(0,Math.min(limit,unique.length));
 }
