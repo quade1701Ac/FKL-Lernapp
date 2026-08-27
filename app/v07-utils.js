@@ -1,4 +1,4 @@
-const STOP = new Set(['der','die','das','den','dem','des','ein','eine','einer','einen','einem','und','oder','ist','sind','wird','werden','bei','mit','für','von','zu','im','in','auf','aus','an','am','als','auch','bzw','z','b','soll','sollte','kann','können','durch','damit','dass','wie','was','warum','welche','welcher','welches']);
+const STOP = new Set(['der','die','das','den','dem','des','ein','eine','einer','einen','einem','und','oder','ist','sind','wird','werden','bei','mit','für','von','zu','im','in','auf','aus','an','am','als','auch','bzw','z','b','soll','sollte','kann','können','durch','damit','dass','wie','was','warum','welche','welcher','welches','noch','nur','sehr','besser','bessere']);
 
 const GROUPS = [
   ['schaden','beschädigung','beschädigt','defekt'],
@@ -21,6 +21,14 @@ const GROUPS = [
   ['weg','wege','laufweg','fahrweg'],
   ['verwechslung','falschlieferung','falscher artikel'],
   ['kennzeichnung','etikett','label','barcode'],
+  ['tracking','sendungsverfolgung','nachverfolgung','verfolgen','verfolgt','verfolgbar','verfolgbarkeit'],
+  ['status','sendungsstatus','übersicht','transparenz'],
+  ['planung','planen','planbar','planbarkeit'],
+  ['kunde','kundeninformation','kundeninfo','empfänger'],
+  ['zustellung','lieferung','sendung','transport'],
+  ['fehler','fehlerquote','abweichung','differenz'],
+  ['effizienz','wirtschaftlich','wirtschaftlichkeit','produktivität'],
+  ['zeit','dauer','laufzeit','wartezeit'],
 ];
 
 function norm(s=''){
@@ -28,39 +36,76 @@ function norm(s=''){
 }
 function stem(w){
   let x=norm(w);
-  for(const end of ['ungen','ung','keiten','keit','heiten','heit','ern','en','er','es','e','n','s']) if(x.length>6&&x.endsWith(end)){x=x.slice(0,-end.length);break}
+  for(const end of ['ungen','ung','keiten','keit','heiten','heit','barkeit','bar','ern','eln','en','er','es','e','n','s']) if(x.length>6&&x.endsWith(end)){x=x.slice(0,-end.length);break}
   return x;
 }
 function words(s){return norm(s).split(' ').filter(w=>w.length>=4&&!STOP.has(w))}
+function groupFor(term){
+  const n=norm(term);
+  return GROUPS.find(g=>g.some(x=>{const nx=norm(x);return n===nx||n.includes(nx)||nx.includes(n)}));
+}
+function conceptKey(term){
+  const g=groupFor(term);
+  return g?norm(g[0]):stem(term);
+}
 function relatedTerms(term){
   const n=norm(term); const set=new Set([n]);
-  for(const g of GROUPS) if(g.some(x=>n.includes(norm(x))||norm(x).includes(n))) g.forEach(x=>set.add(norm(x)));
+  const g=groupFor(term); if(g)g.forEach(x=>set.add(norm(x)));
   return [...set];
 }
 function termHit(text,term){
   const nt=norm(text); const tokens=words(text).map(stem);
-  return relatedTerms(term).some(t=>nt.includes(t)||tokens.some(w=>{const s=stem(t);return s.length>=4&&(w.startsWith(s)||s.startsWith(w))}));
+  return relatedTerms(term).some(t=>{
+    const s=stem(t);
+    return nt.includes(t)||tokens.some(w=>s.length>=4&&(w.startsWith(s)||s.startsWith(w)));
+  });
+}
+function uniqueHits(text,keywords=[]){
+  const seen=new Set(),hits=[];
+  for(const k of keywords){
+    if(!termHit(text,k))continue;
+    const key=conceptKey(k);
+    if(seen.has(key))continue;
+    seen.add(key);hits.push(k);
+  }
+  return hits;
+}
+function semanticOverlap(answer,solution){
+  const a=[...new Set(words(answer).map(stem))];
+  const s=[...new Set(words(solution).map(stem))];
+  let count=0;
+  for(const aw of a){
+    if(s.some(sw=>aw.length>=4&&(aw.startsWith(sw)||sw.startsWith(aw)))){count++;continue}
+    const ag=groupFor(aw);
+    if(ag&&s.some(sw=>ag.some(x=>{const xs=stem(x);return sw.startsWith(xs)||xs.startsWith(sw)})))count++;
+  }
+  return count;
 }
 
 export function scoreAnswerV07(answer,q,fallback){
   if(q.type==='number') return fallback(answer,q);
   const text=norm(answer); if(!text) return {score:0,hits:[]};
-  const hits=(q.keywords||[]).filter(k=>termHit(text,k));
-  const target=q.minHits||Math.max(2,Math.ceil((q.keywords||[]).length/2));
-  let score=Math.min(100,Math.round((hits.length/Math.max(1,target))*100));
 
-  // Zusätzlicher Bedeutungsabgleich mit der Musterlösung. Dadurch werden sinnvolle
-  // Formulierungen erkannt, auch wenn nicht exakt die hinterlegten Schlüsselwörter fallen.
-  const aStems=[...new Set(words(answer).map(stem))];
-  const sStems=[...new Set(words(q.solution||'').map(stem))];
-  const overlap=aStems.filter(a=>sStems.some(s=>a.length>=4&&(a.startsWith(s)||s.startsWith(a)))).length;
-  if(overlap>=3) score=Math.max(score,80);
+  const hits=uniqueHits(text,q.keywords||[]);
+  const keywordConcepts=new Set((q.keywords||[]).map(conceptKey)).size;
+  const requested=q.minHits||Math.max(2,Math.ceil(keywordConcepts/2));
+  const target=Math.max(1,Math.min(requested,keywordConcepts||requested));
+  let score=Math.min(100,Math.round((hits.length/target)*100));
+
+  // Sinngemäßer Abgleich mit der Musterlösung: Wortstämme und fachliche Synonymgruppen.
+  const overlap=semanticOverlap(answer,q.solution||'');
+  const contentWords=[...new Set(words(answer).map(stem))].length;
+  if(overlap>=4) score=Math.max(score,90);
+  else if(overlap===3) score=Math.max(score,80);
   else if(overlap===2) score=Math.max(score,70);
-  else if(overlap===1&&hits.length>=1) score=Math.max(score,55);
+  else if(overlap===1&&hits.length>=1) score=Math.max(score,60);
 
-  // Kurze, aber inhaltlich klare Antworten nicht künstlich abstrafen.
-  if(hits.length>=1&&text.length>=20&&score<60) score=60;
-  if(hits.length>=2&&score<70) score=70;
+  // Eine fachlich erkennbare Kernaussage darf nicht wegen anderer Formulierung auf 0/33 % fallen.
+  if(hits.length>=1&&contentWords>=3) score=Math.max(score,65);
+  if(hits.length>=1&&contentWords>=4&&overlap>=1) score=Math.max(score,70);
+  if(hits.length>=2&&contentWords>=4) score=Math.max(score,75);
+  if(hits.length>=target&&target>0) score=Math.max(score,90);
+
   return {score:Math.min(100,score),hits};
 }
 
