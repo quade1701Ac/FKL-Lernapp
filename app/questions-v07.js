@@ -10,5 +10,6 @@ import { qualityReplacementQuestions } from './question-quality-filter';
 import { qualityLf9to12Questions } from './questions-quality-lf9-12';
 import { v10Batch1Questions } from './questions-v10-batch1';
 import { v10CalculationQuestions } from './questions-v10-calculations';
+import { v10SituationQuestions1 } from './questions-v10-situations-1';
 
-export const v07Questions = [...v08Questions, ...v09Questions, ...qualityQuestions, ...v11Questions, ...replacementLf5to12Questions, ...expansionV12Questions, ...qualityReplacementQuestions, ...qualityLf9to12Questions, ...v10Batch1Questions, ...v10CalculationQuestions];
+export const v07Questions = [...v08Questions, ...v09Questions, ...qualityQuestions, ...v11Questions, ...replacementLf5to12Questions, ...expansionV12Questions, ...qualityReplacementQuestions, ...qualityLf9to12Questions, ...v10Batch1Questions, ...v10CalculationQuestions, ...v10SituationQuestions1];
