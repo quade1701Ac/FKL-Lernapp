@@ -32,6 +32,8 @@ const GROUPS = [
 ];
 
 const CONTEXT_ONLY = new Set(['fahrer','kunde','zustellung','status']);
+const NEGATION = /\b(nicht|kein|keine|keinen|keinem|keiner|niemals|nie|unnötig|ueberfluessig|überflüssig|ignorieren|egal)\b/;
+const KEYWORD_DUMP_SEPARATORS = /[,;/|]/g;
 
 function norm(s=''){
   return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss').replace(/[^a-z0-9äöü€%+\- ]/g,' ').replace(/\s+/g,' ').trim();
@@ -74,6 +76,21 @@ function requestedAspects(q){
 }
 function creditHits(hits){return hits.filter(h=>!CONTEXT_ONLY.has(conceptKey(h)))}
 function roundScore(n){return Math.max(0,Math.min(100,Math.round(n/10)*10))}
+function looksLikeKeywordDump(raw,contentWords,usefulHits){
+  const separators=(String(raw).match(KEYWORD_DUMP_SEPARATORS)||[]).length;
+  const hasSentenceSignal=/[.!?]|\b(weil|damit|deshalb|dadurch|anschließend|zuerst|danach|wenn|um)\b/i.test(String(raw));
+  return usefulHits>=2&&contentWords<=Math.max(4,usefulHits+1)&&separators>=usefulHits-1&&!hasSentenceSignal;
+}
+function hasSuspiciousNegation(answer,q,hits){
+  const a=norm(answer);if(!NEGATION.test(a)||!hits.length)return false;
+  // Negation directly around a credited concept is suspicious. This prevents answers such as
+  // „Schaden nicht dokumentieren“ from earning points merely for containing both keywords.
+  return hits.some(k=>relatedTerms(k).some(t=>{
+    const idx=a.indexOf(t);if(idx<0)return false;
+    const left=a.slice(Math.max(0,idx-28),idx),right=a.slice(idx+t.length,idx+t.length+28);
+    return NEGATION.test(left)||NEGATION.test(right);
+  }));
+}
 
 export function scoreAnswerV07(answer,q,fallback){
   if(q.type==='number') return fallback(answer,q);
@@ -85,28 +102,31 @@ export function scoreAnswerV07(answer,q,fallback){
   const contentWords=[...new Set(words(answer).map(stem))].length;
   const needed=requestedAspects(q);
 
-  // Bewertet werden richtige fachliche Aspekte, nicht bloß Wörter aus der Musterlösung.
-  // Kontextwörter wie "Fahrer" oder "Kunde" geben alleine keine Punkte.
+  // Fachliche Aspekte zählen, bloße Kontextwörter nicht.
   let aspects=usefulHits.length;
 
-  // Eine sauber sinngemäße Formulierung kann einen nicht explizit als Keyword hinterlegten
-  // richtigen Aspekt ergänzen. Maximal ein Zusatzaspekt, damit Wortüberschneidungen nicht aufblasen.
-  if(contentWords>=4&&overlap>=3&&aspects<needed) aspects++;
+  // Sinngemäße Antworten dürfen genau einen zusätzlichen Aspekt erhalten. Das greift erst bei
+  // ausreichend zusammenhängendem Inhalt, nicht bei zufälliger Wortüberschneidung.
+  if(contentWords>=6&&overlap>=4&&aspects<needed) aspects++;
 
   let score=aspects>0?roundScore((Math.min(aspects,needed)/needed)*100):0;
 
-  // Für 100 % muss die Antwort erkennbar vollständig sein. Bei längeren Erklärfragen reicht
-  // reines Keyword-Aufzählen nicht ganz aus.
-  if(score===100&&needed>=2&&contentWords<4) score=80;
+  // Vollpunktzahl verlangt eine erkennbare Erklärung statt einer bloßen Stichwortwolke.
+  if(score===100&&needed>=2&&contentWords<5) score=80;
+  if(looksLikeKeywordDump(answer,contentWords,usefulHits)) score=Math.min(score,50);
 
   // Vergleichsfragen müssen beide Seiten fachlich unterscheiden.
   if(isComparisonQuestion(q)){
-    if(usefulHits.length<2||overlap<2||contentWords<4) score=Math.min(score,50);
-    if(usefulHits.length>=2&&overlap>=3&&contentWords>=5) score=100;
+    if(usefulHits.length<2||overlap<2||contentWords<5) score=Math.min(score,50);
+    if(usefulHits.length>=2&&overlap>=4&&contentWords>=6) score=100;
   }
 
-  // Einzelnes Kontextwort oder inhaltsarme Kurzantwort bleibt 0 %.
-  if(usefulHits.length===0&&overlap<2) score=0;
+  // Negierte richtige Begriffe sind kein Wissenstreffer. Bei verdächtiger Negation wird die
+  // automatische Bewertung bewusst streng gedeckelt und die Musterlösung bleibt sichtbar.
+  if(hasSuspiciousNegation(answer,q,usefulHits)) score=Math.min(score,20);
+
+  // Inhaltsarme Kurzantworten und reine Kontexttreffer bleiben bei 0 %.
+  if(usefulHits.length===0&&overlap<3) score=0;
   if(contentWords<=1) score=0;
 
   return {score:Math.min(100,score),hits};
