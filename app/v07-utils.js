@@ -12,7 +12,7 @@ const GROUPS = [
   ['melden','informieren','benachrichtigen'],
   ['reserve','sicherheit','puffer','sicherheitsbestand','mindestbestand'],
   ['kosten','aufwand','mehrkosten'],
-  ['qualität','fehlerfrei','mangel'],
+  ['qualität','beschaffenheit','zustand','art'],
   ['lieferzeit','laufzeit'],
   ['termintreue','pünktlich','pünktlichkeit'],
   ['bestand','lagerbestand','vorrat'],
@@ -44,81 +44,69 @@ function groupFor(term){
   const n=norm(term);
   return GROUPS.find(g=>g.some(x=>{const nx=norm(x);return n===nx||n.includes(nx)||nx.includes(n)}));
 }
-function conceptKey(term){
-  const g=groupFor(term);
-  return g?norm(g[0]):stem(term);
-}
-function relatedTerms(term){
-  const n=norm(term); const set=new Set([n]);
-  const g=groupFor(term); if(g)g.forEach(x=>set.add(norm(x)));
-  return [...set];
-}
+function conceptKey(term){const g=groupFor(term);return g?norm(g[0]):stem(term)}
+function relatedTerms(term){const n=norm(term),set=new Set([n]);const g=groupFor(term);if(g)g.forEach(x=>set.add(norm(x)));return [...set]}
 function termHit(text,term){
-  const nt=norm(text); const tokens=words(text).map(stem);
-  return relatedTerms(term).some(t=>{
-    const s=stem(t);
-    return nt.includes(t)||tokens.some(w=>s.length>=4&&(w.startsWith(s)||s.startsWith(w)));
-  });
+  const nt=norm(text),tokens=words(text).map(stem);
+  return relatedTerms(term).some(t=>{const s=stem(t);return nt.includes(t)||tokens.some(w=>s.length>=4&&(w.startsWith(s)||s.startsWith(w)))})
 }
 function uniqueHits(text,keywords=[]){
   const seen=new Set(),hits=[];
-  for(const k of keywords){
-    if(!termHit(text,k))continue;
-    const key=conceptKey(k);
-    if(seen.has(key))continue;
-    seen.add(key);hits.push(k);
-  }
+  for(const k of keywords){if(!termHit(text,k))continue;const key=conceptKey(k);if(seen.has(key))continue;seen.add(key);hits.push(k)}
   return hits;
 }
 function semanticOverlap(answer,solution){
-  const a=[...new Set(words(answer).map(stem))];
-  const s=[...new Set(words(solution).map(stem))];
-  let count=0;
-  for(const aw of a){
-    if(s.some(sw=>aw.length>=4&&(aw.startsWith(sw)||sw.startsWith(aw)))){count++;continue}
-    const ag=groupFor(aw);
-    if(ag&&s.some(sw=>ag.some(x=>{const xs=stem(x);return sw.startsWith(xs)||xs.startsWith(sw)})))count++;
-  }
+  const a=[...new Set(words(answer).map(stem))],s=[...new Set(words(solution).map(stem))];let count=0;
+  for(const aw of a){if(s.some(sw=>aw.length>=4&&(aw.startsWith(sw)||sw.startsWith(aw)))){count++;continue}const ag=groupFor(aw);if(ag&&s.some(sw=>ag.some(x=>{const xs=stem(x);return sw.startsWith(xs)||xs.startsWith(sw)})))count++}
   return count;
 }
+function isComparisonQuestion(q){const x=norm(q?.question||'');return x.includes('unterschied')||x.includes('unterscheid')||x.includes('gegenuber')||x.includes('im vergleich')}
 
 export function scoreAnswerV07(answer,q,fallback){
   if(q.type==='number') return fallback(answer,q);
-  const text=norm(answer); if(!text) return {score:0,hits:[]};
+  const text=norm(answer);if(!text)return {score:0,hits:[]};
 
   const hits=uniqueHits(text,q.keywords||[]);
   const keywordConcepts=new Set((q.keywords||[]).map(conceptKey)).size;
   const requested=q.minHits||Math.max(2,Math.ceil(keywordConcepts/2));
   const target=Math.max(1,Math.min(requested,keywordConcepts||requested));
-  let score=Math.min(100,Math.round((hits.length/target)*100));
-
-  // Sinngemäßer Abgleich mit der Musterlösung: Wortstämme und fachliche Synonymgruppen.
   const overlap=semanticOverlap(answer,q.solution||'');
   const contentWords=[...new Set(words(answer).map(stem))].length;
-  if(overlap>=4) score=Math.max(score,90);
-  else if(overlap===3) score=Math.max(score,80);
-  else if(overlap===2) score=Math.max(score,70);
-  else if(overlap===1&&hits.length>=1) score=Math.max(score,60);
 
-  // Eine fachlich erkennbare Kernaussage darf nicht wegen anderer Formulierung auf 0/33 % fallen.
-  if(hits.length>=1&&contentWords>=3) score=Math.max(score,65);
-  if(hits.length>=1&&contentWords>=4&&overlap>=1) score=Math.max(score,70);
-  if(hits.length>=2&&contentWords>=4) score=Math.max(score,75);
-  if(hits.length>=target&&target>0) score=Math.max(score,90);
+  // Einzelne Schlagwörter reichen nicht mehr für eine gute Bewertung.
+  let score=0;
+  if(hits.length>=1) score=20;
+  if(hits.length>=2) score=40;
+  if(hits.length>=3) score=60;
+
+  // Sinngemäße Übereinstimmung hebt nur an, wenn die Antwort genügend Inhalt besitzt.
+  if(contentWords>=4&&overlap>=2) score=Math.max(score,60);
+  if(contentWords>=5&&overlap>=3) score=Math.max(score,80);
+  if(contentWords>=6&&overlap>=4) score=Math.max(score,90);
+  if(hits.length>=target&&target>0&&contentWords>=5) score=Math.max(score,90);
+
+  // Vergleichsfragen verlangen mehrere fachliche Aspekte. Ein einzelner Treffer kann
+  // den Unterschied zwischen zwei Begriffen nicht erklären.
+  if(isComparisonQuestion(q)){
+    if(hits.length<2||contentWords<4) score=Math.min(score,30);
+    else if(hits.length<target&&overlap<3) score=Math.min(score,60);
+  }
+
+  // Sehr kurze Antworten werden bewusst gedeckelt, damit Keyword-Raten nicht belohnt wird.
+  if(contentWords<=2) score=Math.min(score,20);
+  else if(contentWords===3) score=Math.min(score,40);
 
   return {score:Math.min(100,score),hits};
 }
 
 export function calculationInfo(q){
-  const id=q?.id||'';
-  let formula='';
+  const id=q?.id||'';let formula='';
   if(id.startsWith('calc-melde')) formula='Meldebestand = Tagesverbrauch × Lieferzeit + Mindestbestand';
   else if(id.startsWith('calc-avg')) formula='Ø Lagerbestand = (Anfangsbestand + Endbestand) ÷ 2';
   else if(id.startsWith('calc-umschlag')) formula='Umschlagshäufigkeit = Jahresverbrauch ÷ Ø Lagerbestand';
   else if(id.startsWith('calc-dauer')) formula='Ø Lagerdauer = 360 ÷ Umschlagshäufigkeit';
   else if(id.startsWith('calc-andler')) formula='Optimale Bestellmenge = √((200 × Jahresbedarf × Bestellkosten) ÷ (Einstandspreis × Lagerhaltungskostensatz))';
   else if(id.startsWith('calc-inventur')) formula='Inventurdifferenz = Sollbestand − Istbestand';
-  const raw=String(q?.solution||'');
-  const parts=raw.split('Ergebnis:');
+  const raw=String(q?.solution||''),parts=raw.split('Ergebnis:');
   return {formula,rechenweg:(parts[0]||'').trim().replace(/=$/,'').trim(),ergebnis:(parts[1]||'').trim()};
 }
