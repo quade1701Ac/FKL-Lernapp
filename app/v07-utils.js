@@ -31,6 +31,8 @@ const GROUPS = [
   ['zeit','dauer','laufzeit','wartezeit'],
 ];
 
+const CONTEXT_ONLY = new Set(['fahrer','kunde','zustellung','status']);
+
 function norm(s=''){
   return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss').replace(/[^a-z0-9äöü€%+\- ]/g,' ').replace(/\s+/g,' ').trim();
 }
@@ -61,37 +63,51 @@ function semanticOverlap(answer,solution){
   return count;
 }
 function isComparisonQuestion(q){const x=norm(q?.question||'');return x.includes('unterschied')||x.includes('unterscheid')||x.includes('gegenuber')||x.includes('im vergleich')}
+function requestedAspects(q){
+  const x=norm(q?.question||'');
+  const numberWords={eins:1,einen:1,eine:1,zwei:2,drei:3,vier:4,fuenf:5,'fünf':5,sechs:6};
+  for(const [word,n] of Object.entries(numberWords)) if(new RegExp(`\\b${word}\\b`).test(x)) return n;
+  if(isComparisonQuestion(q)) return 2;
+  if(q?.minHits) return Math.max(1,q.minHits);
+  const concepts=new Set((q?.keywords||[]).map(conceptKey)).size;
+  return Math.max(1,Math.min(3,Math.ceil(concepts/2)||1));
+}
+function creditHits(hits){return hits.filter(h=>!CONTEXT_ONLY.has(conceptKey(h)))}
+function roundScore(n){return Math.max(0,Math.min(100,Math.round(n/10)*10))}
 
 export function scoreAnswerV07(answer,q,fallback){
   if(q.type==='number') return fallback(answer,q);
   const text=norm(answer);if(!text)return {score:0,hits:[]};
 
   const hits=uniqueHits(text,q.keywords||[]);
-  const keywordConcepts=new Set((q.keywords||[]).map(conceptKey)).size;
-  const requested=q.minHits||Math.max(2,Math.ceil(keywordConcepts/2));
-  const target=Math.max(1,Math.min(requested,keywordConcepts||requested));
+  const usefulHits=creditHits(hits);
   const overlap=semanticOverlap(answer,q.solution||'');
   const contentWords=[...new Set(words(answer).map(stem))].length;
+  const needed=requestedAspects(q);
 
-  // Ein einzelnes Fachwort ist noch kein Teilwissen. Punkte gibt es erst, wenn mehrere
-  // fachlich passende Inhalte gemeinsam eine erkennbare Teilaussage bilden.
-  let score=0;
-  const meaningfulPartial = hits.length>=2 && overlap>=2 && contentWords>=3;
-  if(meaningfulPartial) score=40;
-  if(hits.length>=3&&overlap>=3&&contentWords>=4) score=60;
-  if(overlap>=3&&contentWords>=5) score=Math.max(score,80);
-  if(overlap>=4&&contentWords>=6) score=Math.max(score,90);
-  if(hits.length>=target&&target>0&&overlap>=3&&contentWords>=5) score=Math.max(score,90);
+  // Bewertet werden richtige fachliche Aspekte, nicht bloß Wörter aus der Musterlösung.
+  // Kontextwörter wie "Fahrer" oder "Kunde" geben alleine keine Punkte.
+  let aspects=usefulHits.length;
 
-  // Vergleichsfragen müssen beide Seiten erkennbar behandeln. Bloßes Nennen eines
-  // Begriffs oder von "Mangel" ist keine richtige Teilaussage.
+  // Eine sauber sinngemäße Formulierung kann einen nicht explizit als Keyword hinterlegten
+  // richtigen Aspekt ergänzen. Maximal ein Zusatzaspekt, damit Wortüberschneidungen nicht aufblasen.
+  if(contentWords>=4&&overlap>=3&&aspects<needed) aspects++;
+
+  let score=aspects>0?roundScore((Math.min(aspects,needed)/needed)*100):0;
+
+  // Für 100 % muss die Antwort erkennbar vollständig sein. Bei längeren Erklärfragen reicht
+  // reines Keyword-Aufzählen nicht ganz aus.
+  if(score===100&&needed>=2&&contentWords<4) score=80;
+
+  // Vergleichsfragen müssen beide Seiten fachlich unterscheiden.
   if(isComparisonQuestion(q)){
-    if(hits.length<2||overlap<2||contentWords<4) score=0;
-    else if(hits.length<target&&overlap<3) score=Math.min(score,40);
+    if(usefulHits.length<2||overlap<2||contentWords<4) score=Math.min(score,50);
+    if(usefulHits.length>=2&&overlap>=3&&contentWords>=5) score=100;
   }
 
-  // Sehr kurze Antworten ohne belastbare Aussage bleiben bei null.
-  if(contentWords<=2) score=0;
+  // Einzelnes Kontextwort oder inhaltsarme Kurzantwort bleibt 0 %.
+  if(usefulHits.length===0&&overlap<2) score=0;
+  if(contentWords<=1) score=0;
 
   return {score:Math.min(100,score),hits};
 }
