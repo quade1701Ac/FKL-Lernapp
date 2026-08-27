@@ -1,4 +1,5 @@
 import './globals.css';
+import AuthGate from './AuthGate';
 
 export const metadata = {
   title: 'LagerLogik Lernapp',
@@ -8,7 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="de">
-      <body>{children}</body>
+      <body><AuthGate>{children}</AuthGate></body>
     </html>
   );
 }
