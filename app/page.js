@@ -10,12 +10,13 @@ import { scoreAnswerV07, calculationInfo } from './v07-utils';
 import { supabase } from './supabase-client';
 
 const SESSION_SIZE=20;
+const EXAM_SIZE=30;
 const MODES=[
 {id:'learn',label:'Lernen',icon:'🧠',desc:'20 zufällige Fragen mit direktem Feedback'},
 {id:'cards',label:'Lernkarten',icon:'🗂️',desc:'20 Karten denken und Lösung aufdecken'},
 {id:'test',label:'Test',icon:'✍️',desc:'20 Fragen: Freitext, Multiple Choice und Rechnen'},
 {id:'weak',label:'Schwachstellen',icon:'🎯',desc:'20 Fragen aus dem, was noch nicht sitzt'},
-{id:'exam',label:'Prüfung',icon:'⏱️',desc:'12 gemischte Aufgaben am Stück'}];
+{id:'exam',label:'Prüfung',icon:'⏱️',desc:'30 gemischte Aufgaben am Stück'}];
 const STATS_KEY='lagerlogik-v07-stats',REVIEW_KEY='lagerlogik-v07-review';
 function load(k,f){if(typeof window==='undefined')return f;try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
@@ -50,7 +51,7 @@ export default function Home(){
  function start(id,m='learn'){setSelectedField(id);setSelectedTopic('Alle Themen');resetSession(allQuestions.filter(q=>q.field===id),m)}
  function changeTopic(t){setSelectedTopic(t);setSessionQuestions(pickSession(allQuestions.filter(q=>q.field===selectedField&&(t==='Alle Themen'||q.topic===t))));setIndex(0);setSessionResults([]);clearAnswer()}
  function changeMode(m){if(m==='weak'){startWeakness();return}setMode(m);setSessionQuestions(pickSession(allQuestions.filter(q=>q.field===selectedField&&(selectedTopic==='Alle Themen'||q.topic===selectedTopic))));setSessionResults([]);setIndex(0);clearAnswer()}
- function startExam(){resetSession(allQuestions,'exam',12)}
+ function startExam(){resetSession(allQuestions,'exam',EXAM_SIZE)}
  function startWeakness(){const weighted=allQuestions.map(q=>{const r=reviews[qKey(q)],avg=fieldAverage(q.field);let w=!stats[q.field]?4:Math.max(1,6-Math.floor(avg/20));if(r&&(!r.next||r.next<=Date.now()))w+=5;if(r?.lastScore<60)w+=5;return{q,w}}),bag=[];weighted.forEach(x=>{for(let i=0;i<x.w;i++)bag.push(x.q)});const picked=[];while(bag.length&&picked.length<SESSION_SIZE){const q=bag[Math.floor(Math.random()*bag.length)];if(!picked.some(p=>p.id===q.id))picked.push(q);if(picked.length>=allQuestions.length)break}resetSession(picked.length?picked:allQuestions,'weak',SESSION_SIZE)}
  function scoreMc(q){const chosen=[...mcAnswer].sort((a,b)=>a-b),correct=[...q.correct].sort((a,b)=>a-b),right=chosen.filter(x=>correct.includes(x)).length,wrong=chosen.filter(x=>!correct.includes(x)).length,missed=correct.filter(x=>!chosen.includes(x)).length;let score=Math.round(Math.max(0,(right-wrong)/(correct.length||1))*100);if(!wrong&&missed===0)score=100;return{score,hits:[],mc:true,chosen,correct}}
  function check(){if(!current)return;const scored=current.type==='mc'?scoreMc(current):scoreAnswerV07(answer,current,scoreAnswer);const savedAnswer=current.type==='mc'?mcAnswer.map(i=>current.options[i]).join(' | '):answer;setResult(scored);record(current,scored.score,savedAnswer);setSessionResults(r=>[...r,{id:current.id,field:current.field,topic:current.topic,score:scored.score}])}
