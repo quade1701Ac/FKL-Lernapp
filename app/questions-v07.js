@@ -15,13 +15,31 @@ import { v10SituationQuestions2 } from './questions-v10-situations-2';
 import { balanceV13Questions } from './questions-balance-v13';
 import { balanceV14Questions } from './questions-balance-v14';
 
-// Diese Aufgaben sind fachlich nahezu deckungsgleich mit bereits vorhandenen
-// Aufgaben im kuratierten Pool. Wir behalten jeweils die stärkere Variante,
-// statt Lernende dieselbe Antwort nur in leicht anderer Verpackung abzufragen.
+// Fachlich nahezu deckungsgleiche Varianten. Je Thema bleibt die stärkere bzw.
+// praxisnähere Frage aktiv, statt denselben Lernpunkt mehrfach abzufragen.
 const NEAR_DUPLICATE_IDS = new Set([
-  'qb14-7-01', // Zeitfenster vs. kürzeste Route
-  'qb14-8-01', // seitliche Sicherung bei Freiraum
+  'qb14-7-01', // Zeitfenster vs. kürzeste Route -> sit1/sit2 decken den Transfer bereits ab
+  'qb14-7-04', // Kilometerersparnis vs. Wartezeit -> nahezu identisch zu sit2-7-03
+  'qb14-8-01', // seitliche Sicherung bei Freiraum -> nahezu identisch zu sit2-8-03
+  'qb14-8-02', // beschädigter Zurrgurt -> nahezu identisch zu sit1-8-01
+  'qb14-8-04', // Achslast trotz korrektem Gesamtgewicht -> nahezu identisch zu sit1-8-02
   'qb14-9-02', // widersprüchliche Empfängerdaten / Versandetikett
+  'qb14-9-07', // wertvolle Sendung: Tracking/Haftung/Nachweis -> nahezu identisch zu sit2-9-01
+]);
+
+// Diese Fragen sind nicht zwingend fachlich falsch, passen aber in der aktuellen
+// LF-Zuordnung nicht sauber genug zum Lernfeld. Sie werden bis zu einer späteren
+// gezielten Überarbeitung nicht ausgespielt.
+const MISPLACED_IDS = new Set([
+  'sit2-4-01', // Versandverpackung liegt in LF4, obwohl LF4 hier innerbetrieblicher Transport ist
+  'sit2-4-02', // Versandkennzeichnung gehört nicht in LF4
+  'sit2-4-03', // Mehrweg-/Einweg-Versandverpackung gehört nicht in LF4
+  'sit2-5-01', // Versandbereitstellung statt eigentlicher Kommissionierung
+  'sit2-5-02', // Versand/Ladungsträger statt Kommissionierung
+  'sit2-5-03', // Verladung statt Kommissionierung
+  'sit2-6-01', // Auswahl Paketdienst/Spedition passt fachlich besser zu Versand als Verpacken
+  'sit2-6-02', // Transportmittelwahl statt Verpacken
+  'sit2-6-03', // Sonderfahrten/Expressnetz statt Verpacken
 ]);
 
 const allQuestions = [
@@ -45,7 +63,7 @@ const allQuestions = [
 // Variante bleibt erhalten; nur identische Fragetexte werden entfernt.
 const seenQuestionTexts = new Set();
 export const v07Questions = allQuestions.filter((question) => {
-  if (NEAR_DUPLICATE_IDS.has(question.id)) return false;
+  if (NEAR_DUPLICATE_IDS.has(question.id) || MISPLACED_IDS.has(question.id)) return false;
 
   const normalizedText = String(question.question ?? '')
     .toLowerCase()
