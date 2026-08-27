@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase-client';
+import ProgressDashboard from './ProgressDashboard';
 
 const STATS_KEY='lagerlogik-v07-stats';
 const REVIEW_KEY='lagerlogik-v07-review';
@@ -64,6 +65,7 @@ export default function AuthGate({ children }) {
   const [profileMessage,setProfileMessage]=useState('');
   const [profileError,setProfileError]=useState('');
   const [profileBusy,setProfileBusy]=useState(false);
+  const [dashboardOpen,setDashboardOpen]=useState(false);
 
   function prepareLocalForUser(userId){
     if(typeof window==='undefined'||!userId)return;
@@ -146,7 +148,7 @@ export default function AuthGate({ children }) {
     setProfileBusy(false);
   }
 
-  async function logout(){await supabase.auth.signOut();setCloudCount(0);setProfileOpen(false);}
+  async function logout(){await supabase.auth.signOut();setCloudCount(0);setProfileOpen(false);setDashboardOpen(false);}
 
   if(loading)return <div style={styles.center}><div style={styles.loader}>☁️ Lernstand wird synchronisiert …</div></div>;
 
@@ -174,9 +176,11 @@ export default function AuthGate({ children }) {
   return <>
     <div style={styles.accountBar}>
       <span><b>☁️ Synchronisiert</b> · {cloudCount} Antworten</span>
-      <button onClick={()=>{setProfileOpen(v=>!v);setProfileMessage('');setProfileError('')}} style={styles.profileButton}>👤 {shownName}</button>
+      <button onClick={()=>{setDashboardOpen(true);setProfileOpen(false)}} style={styles.profileButton}>📊 Dashboard</button>
+      <button onClick={()=>{setProfileOpen(v=>!v);setDashboardOpen(false);setProfileMessage('');setProfileError('')}} style={styles.profileButton}>👤 {shownName}</button>
       <button onClick={logout} style={styles.logout}>Abmelden</button>
     </div>
+    {dashboardOpen&&<ProgressDashboard onClose={()=>setDashboardOpen(false)} />}
     {profileOpen&&<div style={styles.profileCard}>
       <div style={styles.profileHead}><div><b>Dein Profil</b><small style={styles.profileEmail}>{session.user.email}</small></div><button onClick={()=>setProfileOpen(false)} style={styles.close}>×</button></div>
       <form onSubmit={saveProfile} style={styles.form}>
