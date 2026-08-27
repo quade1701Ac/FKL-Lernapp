@@ -3,6 +3,58 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase-client';
 
+const STATS_KEY='lagerlogik-v07-stats';
+const REVIEW_KEY='lagerlogik-v07-review';
+
+function safeLoad(key,fallback={}){
+  if(typeof window==='undefined') return fallback;
+  try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}
+}
+
+function answeredCount(stats){
+  return Object.values(stats||{}).reduce((n,s)=>n+(s?.answered||0),0);
+}
+
+function buildStats(rows){
+  const stats={};
+  for(const row of rows){
+    const field=Number(row.field);
+    if(!field) continue;
+    const topic=row.topic||'Sonstiges';
+    const score=Number(row.score)||0;
+    const current=stats[field]||{answered:0,points:0,correct:0,topics:{}};
+    const tp=current.topics[topic]||{answered:0,points:0};
+    stats[field]={
+      ...current,
+      answered:current.answered+1,
+      points:current.points+score,
+      correct:current.correct+(score>=60?1:0),
+      topics:{
+        ...current.topics,
+        [topic]:{answered:tp.answered+1,points:tp.points+score}
+      }
+    };
+  }
+  return stats;
+}
+
+function buildReviews(rows){
+  const latest={};
+  for(const row of rows){
+    if(!row.question_id) continue;
+    const old=latest[row.question_id];
+    if(!old||new Date(row.answered_at)>new Date(old.answered_at)) latest[row.question_id]=row;
+  }
+  const now=Date.now(), reviews={};
+  for(const [id,row] of Object.entries(latest)){
+    const score=Number(row.score)||0;
+    const box=score>=80?1:score>=60?1:0;
+    const delay=score>=80?86400000:score>=60?43200000:0;
+    reviews[id]={box,lastScore:score,next:now+delay};
+  }
+  return reviews;
+}
+
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -10,33 +62,67 @@ export default function AuthGate({ children }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [cloudCount,setCloudCount]=useState(0);
+
+  async function hydrateFromCloud(nextSession){
+    if(!nextSession?.user){setLoading(false);return}
+    setLoading(true);
+    const {data:rows,error:cloudError}=await supabase
+      .from('answer_history')
+      .select('question_id,field,topic,score,answered_at')
+      .order('answered_at',{ascending:true});
+
+    if(!cloudError&&rows){
+      setCloudCount(rows.length);
+      const cloudStats=buildStats(rows);
+      const localStats=safeLoad(STATS_KEY,{});
+      if(answeredCount(cloudStats)>=answeredCount(localStats)){
+        localStorage.setItem(STATS_KEY,JSON.stringify(cloudStats));
+      }
+
+      const cloudReviews=buildReviews(rows);
+      const localReviews=safeLoad(REVIEW_KEY,{});
+      if(Object.keys(cloudReviews).length>=Object.keys(localReviews).length){
+        localStorage.setItem(REVIEW_KEY,JSON.stringify(cloudReviews));
+      }
+    }
+    setLoading(false);
+  }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setLoading(false);
+    let active=true;
+    supabase.auth.getSession().then(async({ data }) => {
+      if(!active)return;
+      const next=data.session??null;
+      setSession(next);
+      await hydrateFromCloud(next);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if(!active)return;
       setSession(nextSession ?? null);
+      if(nextSession) setTimeout(()=>hydrateFromCloud(nextSession),0);
+      else setLoading(false);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {active=false;listener.subscription.unsubscribe();};
   }, []);
 
   async function login(e) {
     e.preventDefault();
     setBusy(true);
     setError('');
-    const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
     if (loginError) setError(loginError.message === 'Invalid login credentials' ? 'E-Mail oder Passwort ist falsch.' : loginError.message);
+    else if(data.session) await hydrateFromCloud(data.session);
     setBusy(false);
   }
 
   async function logout() {
     await supabase.auth.signOut();
+    setCloudCount(0);
   }
 
   if (loading) {
-    return <div style={styles.center}><div style={styles.loader}>LagerLogik wird geladen …</div></div>;
+    return <div style={styles.center}><div style={styles.loader}>☁️ Lernstand wird synchronisiert …</div></div>;
   }
 
   if (!session) {
@@ -46,7 +132,7 @@ export default function AuthGate({ children }) {
           <div style={styles.logo}>▣ <strong>LagerLogik</strong> <span style={styles.version}>online</span></div>
           <p style={styles.kicker}>FACHKRAFT FÜR LAGERLOGISTIK</p>
           <h1 style={styles.title}>Anmelden</h1>
-          <p style={styles.text}>Melde dich an, damit dein Lernstand deinem Konto zugeordnet werden kann.</p>
+          <p style={styles.text}>Melde dich an, damit dein Lernstand deinem Konto zugeordnet und auf deinen Geräten synchronisiert wird.</p>
           <form onSubmit={login} style={styles.form}>
             <label style={styles.label}>E-Mail</label>
             <input style={styles.input} type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required />
@@ -64,7 +150,7 @@ export default function AuthGate({ children }) {
   return (
     <>
       <div style={styles.accountBar}>
-        <span><b>☁️ Online</b> · {session.user.email}</span>
+        <span><b>☁️ Synchronisiert</b> · {session.user.email} · {cloudCount} Cloud-Antworten</span>
         <button onClick={logout} style={styles.logout}>Abmelden</button>
       </div>
       {children}
