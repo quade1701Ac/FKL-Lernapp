@@ -73,28 +73,25 @@ export function scoreAnswerV07(answer,q,fallback){
   const overlap=semanticOverlap(answer,q.solution||'');
   const contentWords=[...new Set(words(answer).map(stem))].length;
 
-  // Einzelne Schlagwörter reichen nicht mehr für eine gute Bewertung.
+  // Ein einzelnes Fachwort ist noch kein Teilwissen. Punkte gibt es erst, wenn mehrere
+  // fachlich passende Inhalte gemeinsam eine erkennbare Teilaussage bilden.
   let score=0;
-  if(hits.length>=1) score=20;
-  if(hits.length>=2) score=40;
-  if(hits.length>=3) score=60;
+  const meaningfulPartial = hits.length>=2 && overlap>=2 && contentWords>=3;
+  if(meaningfulPartial) score=40;
+  if(hits.length>=3&&overlap>=3&&contentWords>=4) score=60;
+  if(overlap>=3&&contentWords>=5) score=Math.max(score,80);
+  if(overlap>=4&&contentWords>=6) score=Math.max(score,90);
+  if(hits.length>=target&&target>0&&overlap>=3&&contentWords>=5) score=Math.max(score,90);
 
-  // Sinngemäße Übereinstimmung hebt nur an, wenn die Antwort genügend Inhalt besitzt.
-  if(contentWords>=4&&overlap>=2) score=Math.max(score,60);
-  if(contentWords>=5&&overlap>=3) score=Math.max(score,80);
-  if(contentWords>=6&&overlap>=4) score=Math.max(score,90);
-  if(hits.length>=target&&target>0&&contentWords>=5) score=Math.max(score,90);
-
-  // Vergleichsfragen verlangen mehrere fachliche Aspekte. Ein einzelner Treffer kann
-  // den Unterschied zwischen zwei Begriffen nicht erklären.
+  // Vergleichsfragen müssen beide Seiten erkennbar behandeln. Bloßes Nennen eines
+  // Begriffs oder von "Mangel" ist keine richtige Teilaussage.
   if(isComparisonQuestion(q)){
-    if(hits.length<2||contentWords<4) score=Math.min(score,30);
-    else if(hits.length<target&&overlap<3) score=Math.min(score,60);
+    if(hits.length<2||overlap<2||contentWords<4) score=0;
+    else if(hits.length<target&&overlap<3) score=Math.min(score,40);
   }
 
-  // Sehr kurze Antworten werden bewusst gedeckelt, damit Keyword-Raten nicht belohnt wird.
-  if(contentWords<=2) score=Math.min(score,20);
-  else if(contentWords===3) score=Math.min(score,40);
+  // Sehr kurze Antworten ohne belastbare Aussage bleiben bei null.
+  if(contentWords<=2) score=0;
 
   return {score:Math.min(100,score),hits};
 }
