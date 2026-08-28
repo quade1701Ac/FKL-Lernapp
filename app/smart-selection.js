@@ -4,6 +4,13 @@ import { qualityCheckedQuestions } from './question-quality-filter';
 import { finalAuditQuestions } from './question-audit';
 
 function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
+function shuffleMc(q){
+ if(q?.type!=='mc'||!Array.isArray(q.options)||q.options.length<2)return q;
+ const correct=new Set((q.correct||[]).map(Number));
+ const mixed=shuffle(q.options.map((text,index)=>({text,wasCorrect:correct.has(index)})));
+ return {...q,options:mixed.map(x=>x.text),correct:mixed.map((x,index)=>x.wasCorrect?index:null).filter(x=>x!==null)};
+}
+function preparePicked(list){return list.map(shuffleMc)}
 function checkedPool(qs){return finalAuditQuestions(qualityCheckedQuestions(qs))}
 function average(s){return s?.answered?Math.round((s.points||0)/s.answered):null}
 function weightFor(q,reviews,stats){
@@ -17,6 +24,6 @@ function weightedPick(pool,reviews,stats){const weighted=pool.map(q=>({q,w:weigh
 export function smartPick(qs,limit,reviews={},stats={},randomShare=.35){
  const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()],target=Math.min(limit,unique.length);if(target<=0)return[];
  const randomCount=Math.min(target,Math.max(1,Math.round(target*randomShare))),randomPart=shuffle(unique).slice(0,randomCount),chosen=[...randomPart],chosenIds=new Set(chosen.map(q=>String(q.id)));let pool=unique.filter(q=>!chosenIds.has(String(q.id)));
- while(chosen.length<target&&pool.length){const q=weightedPick(pool,reviews,stats);if(!q)break;chosen.push(q);const id=String(q.id);pool=pool.filter(x=>String(x.id)!==id)}return shuffle(chosen)
+ while(chosen.length<target&&pool.length){const q=weightedPick(pool,reviews,stats);if(!q)break;chosen.push(q);const id=String(q.id);pool=pool.filter(x=>String(x.id)!==id)}return preparePicked(shuffle(chosen))
 }
-export function randomPick(qs,limit){const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];return shuffle(unique).slice(0,Math.min(limit,unique.length))}
+export function randomPick(qs,limit){const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];return preparePicked(shuffle(unique).slice(0,Math.min(limit,unique.length)))}
