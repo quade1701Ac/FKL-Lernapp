@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-// Dieses Modell ist im aktuellen Groq-Free-Plan mit eigenen Limits gelistet.
 const MODEL='openai/gpt-oss-120b';
 
 function safeMessage(value=''){
@@ -16,20 +15,35 @@ export async function POST(request){
     const {question,solution,keywords=[],answer,localScore,requestedCount}=body||{};
     if(!question||!answer)return NextResponse.json({error:'Frage oder Antwort fehlt',stage:'input'},{status:400});
 
-    const prompt=`Bewerte die Antwort eines Auszubildenden Fachkraft für Lagerlogistik fachlich und fair.\n\nFRAGE:\n${question}\n\nMUSTERLÖSUNG:\n${solution||''}\n\nERWARTETE BEGRIFFE/ASPEKTE:\n${keywords.join(', ')}\n\nLOKALER SCORE (nur Hinweis, nicht übernehmen): ${localScore ?? 'unbekannt'}\nVERLANGTE ANZAHL, falls relevant: ${requestedCount ?? 'nicht angegeben'}\n\nANTWORT DES LERNENDEN:\n${answer}\n\nRegeln:\n- Beurteile Bedeutung und Fachlichkeit, nicht exakte Wortwahl oder Rechtschreibung.\n- Eine sinngemäß richtige Ursache-Wirkungs-Erklärung darf volle Punkte erhalten, auch ohne Wörter aus der Musterlösung.\n- Fachlich falsche, ausweichende oder nur scheinbar passende Antworten erhalten wenig oder 0 Punkte.\n- Wenn mehrere Punkte verlangt werden, bewerte proportional zur Zahl fachlich unterschiedlicher richtiger Punkte.\n- Teilweise richtige Antworten erhalten echte Teilpunkte.\n- Verwende nur Scores in Zehnerschritten von 0 bis 100.\n- Antworte ausschließlich als JSON mit score, reason und confidence. confidence ist 0 bis 1. reason maximal zwei kurze deutsche Sätze.`;
+    const prompt=`Du bist ein strenger, konsistenter IHK-naher Prüfer für die Ausbildung Fachkraft für Lagerlogistik. Bewerte nur die fachliche Qualität der konkreten Antwort.\n\nFRAGE:\n${question}\n\nMUSTERLÖSUNG:\n${solution||''}\n\nERWARTETE BEGRIFFE/ASPEKTE:\n${keywords.join(', ')}\n\nLOKALER SCORE (nur Hinweis, nicht übernehmen): ${localScore ?? 'unbekannt'}\nVERLANGTE ANZAHL, falls relevant: ${requestedCount ?? 'nicht angegeben'}\n\nANTWORT DES LERNENDEN:\n${answer}\n\nBewertungsregeln:\n- Beurteile Bedeutung und Fachlichkeit, nicht exakte Wortwahl oder Rechtschreibung.\n- Sinngemäß richtige Ursache-Wirkungs-Erklärungen dürfen volle Punkte erhalten.\n- Fachlich falsche, ausweichende oder nur scheinbar passende Antworten erhalten wenig oder 0 Punkte.\n- Wenn mehrere Punkte verlangt werden, bewerte proportional zur Zahl fachlich unterschiedlicher richtiger Punkte.\n- Teilweise richtige Antworten erhalten echte Teilpunkte.\n- Verwende nur Scores in Zehnerschritten von 0 bis 100.\n- reason maximal zwei kurze deutsche Sätze.\n- confidence liegt zwischen 0 und 1.`;
 
     const response=await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
       headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
       body:JSON.stringify({
         model:MODEL,
-        temperature:0,
+        temperature:0.1,
         max_completion_tokens:220,
-        response_format:{type:'json_object'},
-        messages:[
-          {role:'system',content:'Du bist ein strenger, konsistenter IHK-naher Prüfer für die Ausbildung Fachkraft für Lagerlogistik. Bewerte nur die fachliche Qualität der konkreten Antwort.'},
-          {role:'user',content:prompt}
-        ]
+        reasoning_effort:'low',
+        reasoning_format:'hidden',
+        response_format:{
+          type:'json_schema',
+          json_schema:{
+            name:'grading_result',
+            strict:true,
+            schema:{
+              type:'object',
+              properties:{
+                score:{type:'integer',minimum:0,maximum:100,multipleOf:10},
+                reason:{type:'string'},
+                confidence:{type:'number',minimum:0,maximum:1}
+              },
+              required:['score','reason','confidence'],
+              additionalProperties:false
+            }
+          }
+        },
+        messages:[{role:'user',content:prompt}]
       })
     });
 
