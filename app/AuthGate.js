@@ -77,9 +77,9 @@ export default function AuthGate({ children }) {
     localStorage.setItem(ACTIVE_USER_KEY,userId);
   }
 
-  async function hydrateFromCloud(nextSession){
-    if(!nextSession?.user){setLoading(false);return}
-    setLoading(true);
+  async function hydrateFromCloud(nextSession,{showLoader=true}={}){
+    if(!nextSession?.user){if(showLoader)setLoading(false);return}
+    if(showLoader)setLoading(true);
     prepareLocalForUser(nextSession.user.id);
     const {data:rows,error:cloudError}=await supabase.from('answer_history').select('question_id,field,topic,score,answered_at').order('answered_at',{ascending:true});
     if(!cloudError&&rows){
@@ -89,7 +89,7 @@ export default function AuthGate({ children }) {
       const cloudReviews=buildReviews(rows),localReviews=safeLoad(REVIEW_KEY,{});
       if(Object.keys(cloudReviews).length>=Object.keys(localReviews).length) localStorage.setItem(REVIEW_KEY,JSON.stringify(cloudReviews));
     }
-    setLoading(false);
+    if(showLoader)setLoading(false);
   }
 
   useEffect(()=>{
@@ -101,11 +101,17 @@ export default function AuthGate({ children }) {
       setProfileName(next?.user?.user_metadata?.display_name||'');
       await hydrateFromCloud(next);
     });
-    const {data:listener}=supabase.auth.onAuthStateChange((_event,nextSession)=>{
+    const {data:listener}=supabase.auth.onAuthStateChange((event,nextSession)=>{
       if(!active)return;
       setSession(nextSession??null);
       setProfileName(nextSession?.user?.user_metadata?.display_name||'');
-      if(nextSession)setTimeout(()=>hydrateFromCloud(nextSession),0);else setLoading(false);
+      if(!nextSession){setLoading(false);return}
+      // TOKEN_REFRESHED und andere stille Auth-Ereignisse dürfen die App nicht kurz
+      // ausblenden. Sonst wird die laufende Lern-/Prüfungssession ungemountet und
+      // React startet danach wieder auf der Hauptseite.
+      if(event==='SIGNED_IN'||event==='USER_UPDATED'){
+        setTimeout(()=>hydrateFromCloud(nextSession,{showLoader:false}),0);
+      }
     });
     return()=>{active=false;listener.subscription.unsubscribe();};
   },[]);
