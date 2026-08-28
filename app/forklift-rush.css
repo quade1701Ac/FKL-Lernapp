@@ -1,0 +1,10 @@
+/* Stapler Rush v2: isolated styles so the learning UI stays untouched. */
+.gameHud{grid-template-columns:repeat(4,1fr)}
+.forkliftSprite{position:absolute;width:42px;height:32px;z-index:3;filter:drop-shadow(0 3px 3px rgba(0,0,0,.45));transform:translateY(1px)}
+.forkBody{position:absolute;left:5px;bottom:7px;width:24px;height:13px;background:#f2b84b;border-radius:4px 4px 3px 3px;border:2px solid #a86d18}
+.forkCab{position:absolute;left:11px;bottom:18px;width:15px;height:11px;border:3px solid #f2b84b;border-bottom:0;border-radius:4px 4px 0 0}
+.forkMast{position:absolute;right:7px;bottom:7px;width:3px;height:24px;background:#d7e0ea;border-radius:2px}
+.forkTines{position:absolute;right:0;bottom:5px;width:12px;height:3px;background:#d7e0ea;box-shadow:0 5px 0 #d7e0ea;border-radius:2px}
+.wheel{position:absolute;bottom:1px;width:9px;height:9px;background:#111827;border:2px solid #637086;border-radius:50%;z-index:4}
+.w1{left:8px}.w2{left:25px}.forkLoad{position:absolute;right:-10px;bottom:10px;font-size:17px;z-index:5}
+@media(max-width:640px){.gameHud{grid-template-columns:repeat(2,1fr)}.forkliftSprite{transform:scale(.88)}}

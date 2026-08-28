@@ -1,4 +1,5 @@
 import './globals.css';
+import './forklift-rush.css';
 import AuthGate from './AuthGate';
 
 export const metadata = {
