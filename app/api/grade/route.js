@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
-const MODEL='openai/gpt-oss-120b';
+const MODELS=['openai/gpt-oss-20b','openai/gpt-oss-120b'];
 
 function safeMessage(value=''){
-  return String(value).replace(/gsk_[A-Za-z0-9_-]+/g,'[KEY]').replace(/Bearer\s+\S+/gi,'Bearer [KEY]').slice(0,220);
+  return String(value).replace(/gsk_[A-Za-z0-9_-]+/g,'[KEY]').replace(/Bearer\s+\S+/gi,'Bearer [KEY]').slice(0,260);
 }
 
 function detectRequestedCount(question=''){
@@ -12,6 +12,54 @@ function detectRequestedCount(question=''){
   const m=q.match(/\b(?:nenne|nenn|gib|beschreibe|erkläre|erklaere|erläutere|erlaeutere)?\s*(eins|eine|einen|zwei|drei|vier|fünf|fuenf|sechs|[1-6])\b/);
   if(!m)return null;
   return /^\d$/.test(m[1])?Number(m[1]):(words[m[1]]||null);
+}
+
+const SCHEMA={
+  type:'object',
+  properties:{
+    score:{type:'integer',minimum:0,maximum:100},
+    reason:{type:'string'},
+    confidence:{type:'number',minimum:0,maximum:1}
+  },
+  required:['score','reason','confidence'],
+  additionalProperties:false
+};
+
+async function gradeWithModel(key,model,prompt){
+  const response=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model,
+      temperature:0,
+      max_completion_tokens:220,
+      response_format:{
+        type:'json_schema',
+        json_schema:{name:'grading_result',strict:true,schema:SCHEMA}
+      },
+      messages:[{role:'user',content:prompt}]
+    })
+  });
+
+  if(!response.ok){
+    let problem={};
+    try{problem=await response.json()}catch{problem={message:await response.text().catch(()=> '')}}
+    const message=problem?.error?.message||problem?.message||`HTTP ${response.status}`;
+    const failed=problem?.error?.failed_generation;
+    const detail=failed?(typeof failed==='string'?failed:JSON.stringify(failed)):'';
+    return {ok:false,status:response.status,message:safeMessage(message),detail:safeMessage(detail),model};
+  }
+
+  const data=await response.json();
+  const raw=data?.choices?.[0]?.message?.content||'{}';
+  try{
+    const parsed=JSON.parse(raw);
+    const score=Number(parsed.score);
+    if(!Number.isFinite(score))throw new Error('kein gültiger Score');
+    return {ok:true,parsed,model};
+  }catch(error){
+    return {ok:false,status:500,message:`Antwort konnte nicht gelesen werden: ${safeMessage(error?.message)}`,detail:safeMessage(raw),model};
+  }
 }
 
 export async function POST(request){
@@ -26,63 +74,38 @@ export async function POST(request){
     const explicitCount=Number(requestedCount)||detectRequestedCount(question)||null;
     const gradingMode=explicitCount?'zählfrage':'offene_fachantwort';
 
-    const prompt=`Du bist ein strenger, konsistenter IHK-naher Prüfer für die Ausbildung Fachkraft für Lagerlogistik. Bewerte nur die fachliche Qualität der konkreten Antwort.\n\nFRAGE:\n${question}\n\nMUSTERLÖSUNG:\n${solution||''}\n\nERWARTETE BEGRIFFE/ASPEKTE:\n${keywords.join(', ')}\n\nLOKALER SCORE (nur Hinweis, nicht übernehmen): ${localScore ?? 'unbekannt'}\nBEWERTUNGSMODUS: ${gradingMode}\nVERLANGTE ANZAHL, falls ausdrücklich genannt: ${explicitCount ?? 'keine feste Anzahl'}\n\nANTWORT DES LERNENDEN:\n${answer}\n\nBewertungsregeln:\n- Beurteile Bedeutung und Fachlichkeit, nicht exakte Wortwahl oder Rechtschreibung.\n- Die Musterlösung ist eine Referenz, KEINE Checkliste mit Pflichtformulierungen.\n- Bei offenen Warum-/Wie-/Erkläre-/Begründe-Fragen darf eine alternative fachlich vollständige Erklärung 100 Punkte erhalten, auch wenn einzelne Wörter oder Beispiele der Musterlösung fehlen.\n- Ziehe bei offenen Fragen NICHT allein deshalb Punkte ab, weil zusätzliche Beispiele aus der Musterlösung fehlen, sofern die gestellte Frage fachlich vollständig beantwortet ist.\n- Bewerte den tatsächlich gestellten Arbeitsauftrag, nicht die maximale Vollständigkeit der Musterlösung.\n- Synonyme, andere plausible Praxisbeispiele und richtige Ursache-Wirkungs-Ketten sind gleichwertig.\n- Wenn die Frage ausdrücklich eine Anzahl verlangt, z. B. „Nenne vier …“, zählt die Zahl fachlich unterschiedlicher richtiger Punkte proportional. Zwei richtige von vier entsprechen ungefähr 50 Punkten, drei von vier ungefähr 70 bis 80 Punkten.\n- Bei einer Zählfrage dürfen inhaltlich doppelte Aussagen nicht mehrfach gezählt werden.\n- Fachlich falsche, ausweichende oder nur scheinbar passende Antworten erhalten wenig oder 0 Punkte.\n- Teilweise richtige Antworten erhalten echte Teilpunkte.\n- Eine knappe Antwort kann volle Punkte erhalten, wenn die Frage nur einen Vorteil, eine Ursache oder einen einfachen Zusammenhang verlangt und dieser korrekt genannt ist.\n- Verwende nur Scores in Zehnerschritten von 0 bis 100.\n- reason maximal zwei kurze deutsche Sätze und begründe die Bewertung anhand des tatsächlichen Arbeitsauftrags.\n- confidence liegt zwischen 0 und 1.`;
+    const prompt=`Du bist ein strenger, konsistenter IHK-naher Prüfer für die Ausbildung Fachkraft für Lagerlogistik. Bewerte nur die fachliche Qualität der konkreten Antwort.\n\nFRAGE:\n${question}\n\nMUSTERLÖSUNG:\n${solution||''}\n\nERWARTETE BEGRIFFE/ASPEKTE:\n${keywords.join(', ')}\n\nLOKALER SCORE (nur Hinweis, nicht übernehmen): ${localScore ?? 'unbekannt'}\nBEWERTUNGSMODUS: ${gradingMode}\nVERLANGTE ANZAHL, falls ausdrücklich genannt: ${explicitCount ?? 'keine feste Anzahl'}\n\nANTWORT DES LERNENDEN:\n${answer}\n\nBewertungsregeln:\n- Beurteile Bedeutung und Fachlichkeit, nicht exakte Wortwahl oder Rechtschreibung.\n- Die Musterlösung ist eine Referenz, keine Checkliste mit Pflichtformulierungen.\n- Bei offenen Warum-/Wie-/Erkläre-/Begründe-Fragen darf eine alternative fachlich vollständige Erklärung 100 Punkte erhalten.\n- Ziehe bei offenen Fragen keine Punkte nur deshalb ab, weil zusätzliche Beispiele aus der Musterlösung fehlen.\n- Bewerte den tatsächlich gestellten Arbeitsauftrag.\n- Synonyme, plausible Praxisbeispiele und richtige Ursache-Wirkungs-Ketten sind gleichwertig.\n- Wenn ausdrücklich eine Anzahl verlangt wird, bewerte proportional nach fachlich unterschiedlichen richtigen Punkten.\n- Doppelte Aussagen zählen bei Zählfragen nur einmal.\n- Fachlich falsche, ausweichende oder nur scheinbar passende Antworten erhalten wenig oder 0 Punkte.\n- Teilweise richtige Antworten erhalten Teilpunkte.\n- Eine knappe Antwort kann volle Punkte erhalten, wenn der Arbeitsauftrag damit vollständig erfüllt ist.\n- score liegt zwischen 0 und 100. Ich runde serverseitig auf Zehnerschritte.\n- reason maximal zwei kurze deutsche Sätze.\n- confidence liegt zwischen 0 und 1.`;
 
-    const response=await fetch('https://api.groq.com/openai/v1/chat/completions',{
-      method:'POST',
-      headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:MODEL,
-        temperature:0.1,
-        max_completion_tokens:220,
-        reasoning_effort:'low',
-        reasoning_format:'hidden',
-        response_format:{
-          type:'json_schema',
-          json_schema:{
-            name:'grading_result',
-            strict:true,
-            schema:{
-              type:'object',
-              properties:{
-                score:{type:'integer',minimum:0,maximum:100,multipleOf:10},
-                reason:{type:'string'},
-                confidence:{type:'number',minimum:0,maximum:1}
-              },
-              required:['score','reason','confidence'],
-              additionalProperties:false
-            }
-          }
-        },
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-
-    if(!response.ok){
-      let provider='';
-      try{const problem=await response.json();provider=problem?.error?.message||problem?.message||''}catch{provider=await response.text().catch(()=> '')}
-      console.error('Groq grading failed',response.status,safeMessage(provider));
-      return NextResponse.json({error:`Groq HTTP ${response.status}`,stage:'provider',providerStatus:response.status,providerMessage:safeMessage(provider),model:MODEL},{status:502});
+    const failures=[];
+    for(const model of MODELS){
+      const result=await gradeWithModel(key,model,prompt);
+      if(result.ok){
+        const parsed=result.parsed;
+        return NextResponse.json({
+          score:Math.max(0,Math.min(100,Math.round(Number(parsed.score)/10)*10)),
+          reason:String(parsed.reason||'').slice(0,240),
+          confidence:Math.max(0,Math.min(1,Number(parsed.confidence)||0)),
+          model:result.model,
+          gradingMode,
+          requestedCount:explicitCount,
+          stage:'ok'
+        });
+      }
+      failures.push(result);
+      console.error('Groq grading attempt failed',result.model,result.status,result.message,result.detail);
     }
 
-    const data=await response.json();
-    const raw=data?.choices?.[0]?.message?.content||'{}';
-    let parsed;
-    try{parsed=JSON.parse(raw)}catch{throw new Error(`Ungültiges JSON vom Modell: ${safeMessage(raw)}`)}
-    const score=Number(parsed.score);
-    if(!Number.isFinite(score))throw new Error('Modell lieferte keinen gültigen Score');
-
+    const last=failures[failures.length-1]||{};
     return NextResponse.json({
-      score:Math.max(0,Math.min(100,Math.round(score/10)*10)),
-      reason:String(parsed.reason||'').slice(0,240),
-      confidence:Math.max(0,Math.min(1,Number(parsed.confidence)||0)),
-      model:MODEL,
-      gradingMode,
-      requestedCount:explicitCount,
-      stage:'ok'
-    });
+      error:'KI-Bewertung nach zwei Versuchen fehlgeschlagen',
+      stage:'provider',
+      providerStatus:last.status||502,
+      providerMessage:last.message||'Unbekannter Groq-Fehler',
+      providerDetail:last.detail||'',
+      attemptedModels:MODELS
+    },{status:502});
   }catch(error){
     console.error('AI grading error',error);
-    return NextResponse.json({error:safeMessage(error?.message||'AI grading failed'),stage:'server',model:MODEL},{status:500});
+    return NextResponse.json({error:safeMessage(error?.message||'AI grading failed'),stage:'server'},{status:500});
   }
 }
