@@ -16,14 +16,16 @@ function detectRequestedCount(question=''){
 
 function parseGrade(raw=''){
   const text=String(raw).trim();
-  try{return JSON.parse(text)}catch{}
-  const block=text.match(/\{[\s\S]*?\}/);
-  if(block){try{return JSON.parse(block[0])}catch{}}
-  const score=text.match(/(?:score|punkte?)\s*[:=]\s*(\d{1,3})/i)?.[1] ?? text.match(/^\s*(\d{1,3})\b/)?.[1];
-  if(score==null)return null;
-  const reason=text.match(/(?:reason|begründung|begruendung)\s*[:=]\s*["']?([^\n}"']+)/i)?.[1]||'KI-Bewertung erfolgreich.';
-  const confidence=text.match(/confidence\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)/i)?.[1];
-  return {score:Number(score),reason,confidence:confidence==null?.75:Number(confidence)};
+  const scoreMatch=text.match(/(?:^|\n)\s*SCORE\s*:\s*(100|\d{1,2})\s*(?:%|$)/i)
+    || text.match(/(?:score|punkte?)\s*[:=]\s*(100|\d{1,2})\b/i)
+    || text.match(/^\s*(100|\d{1,2})\s*(?:%|$)/);
+  if(!scoreMatch)return null;
+  const reason=text.match(/(?:^|\n)\s*REASON\s*:\s*(.+?)(?=\n\s*CONFIDENCE\s*:|$)/is)?.[1]
+    || text.match(/(?:reason|begründung|begruendung)\s*[:=]\s*(.+?)(?=\n|$)/i)?.[1]
+    || 'KI-Bewertung erfolgreich.';
+  const confidenceMatch=text.match(/(?:^|\n)\s*CONFIDENCE\s*:\s*(0(?:\.\d+)?|1(?:\.0+)?)\s*$/im)
+    || text.match(/confidence\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)/i);
+  return {score:Number(scoreMatch[1]),reason:String(reason).trim(),confidence:confidenceMatch?Number(confidenceMatch[1]):.75};
 }
 
 async function gradeWithModel(key,model,prompt){
@@ -33,9 +35,9 @@ async function gradeWithModel(key,model,prompt){
     body:JSON.stringify({
       model,
       temperature:0,
-      max_completion_tokens:300,
+      max_completion_tokens:260,
       messages:[
-        {role:'system',content:'Du bewertest Antworten. Antworte ausschließlich mit einem kompakten JSON-Objekt ohne Markdown: {"score":0,"reason":"kurze Begründung","confidence":0.9}. score 0-100, confidence 0-1.'},
+        {role:'system',content:'Du bewertest Antworten. Gib EXAKT drei Zeilen aus, ohne JSON, Markdown oder Zusatztext:\nSCORE: 0-100\nREASON: kurze deutsche Begründung\nCONFIDENCE: 0.0-1.0'},
         {role:'user',content:prompt}
       ]
     })
@@ -51,8 +53,7 @@ async function gradeWithModel(key,model,prompt){
   const data=await response.json();
   const raw=data?.choices?.[0]?.message?.content||'';
   const parsed=parseGrade(raw);
-  const score=Number(parsed?.score);
-  if(!parsed||!Number.isFinite(score))return {ok:false,status:500,message:'KI-Antwort enthielt keinen lesbaren Score',detail:safeMessage(raw),model};
+  if(!parsed||!Number.isFinite(parsed.score))return {ok:false,status:500,message:'KI-Antwort enthielt keinen lesbaren Score',detail:safeMessage(raw),model};
   return {ok:true,parsed,model};
 }
 
@@ -68,7 +69,7 @@ export async function POST(request){
     const explicitCount=Number(requestedCount)||detectRequestedCount(question)||null;
     const gradingMode=explicitCount?'zählfrage':'offene_fachantwort';
 
-    const prompt=`FRAGE:\n${question}\n\nMUSTERLÖSUNG:\n${solution||''}\n\nERWARTETE BEGRIFFE/ASPEKTE:\n${keywords.join(', ')}\n\nLOKALER SCORE (nur Hinweis, nicht übernehmen): ${localScore ?? 'unbekannt'}\nBEWERTUNGSMODUS: ${gradingMode}\nVERLANGTE ANZAHL: ${explicitCount ?? 'keine feste Anzahl'}\n\nANTWORT:\n${answer}\n\nBewerte als strenger, konsistenter IHK-naher Prüfer für Fachkraft für Lagerlogistik. Regeln:\n- Bedeutung und Fachlichkeit zählen, nicht Wortlaut, Rechtschreibung oder Stil.\n- Musterlösung ist Referenz, keine Pflicht-Checkliste.\n- Offene Warum-/Wie-/Erkläre-/Begründe-Fragen können mit alternativer vollständiger Erklärung 100 Punkte erhalten.\n- Keine Abzüge nur wegen fehlender zusätzlicher Beispiele aus der Musterlösung, wenn der Arbeitsauftrag erfüllt ist.\n- Synonyme, plausible Praxisbeispiele und korrekte Ursache-Wirkungs-Ketten gelten.\n- Bei ausdrücklich verlangter Anzahl proportional nach fachlich unterschiedlichen richtigen Punkten bewerten.\n- Doppelte Punkte nur einmal zählen.\n- Falsche oder ausweichende Antworten 0 oder wenig Punkte. Teilrichtiges erhält echte Teilpunkte.\n- Eine knappe Antwort darf volle Punkte erhalten, wenn sie den Arbeitsauftrag vollständig erfüllt.\n- Gib einen Score 0-100. reason maximal zwei kurze deutsche Sätze. confidence 0-1.`;
+    const prompt=`FRAGE:\n${question}\n\nMUSTERLÖSUNG:\n${solution||''}\n\nERWARTETE BEGRIFFE/ASPEKTE:\n${keywords.join(', ')}\n\nLOKALER SCORE (nur Hinweis, nicht übernehmen): ${localScore ?? 'unbekannt'}\nBEWERTUNGSMODUS: ${gradingMode}\nVERLANGTE ANZAHL: ${explicitCount ?? 'keine feste Anzahl'}\n\nANTWORT:\n${answer}\n\nBewerte als strenger, konsistenter IHK-naher Prüfer für Fachkraft für Lagerlogistik. Regeln:\n- Bedeutung und Fachlichkeit zählen, nicht Wortlaut, Rechtschreibung oder Stil.\n- Musterlösung ist Referenz, keine Pflicht-Checkliste.\n- Offene Warum-/Wie-/Erkläre-/Begründe-Fragen können mit alternativer vollständiger Erklärung 100 Punkte erhalten.\n- Keine Abzüge nur wegen fehlender zusätzlicher Beispiele aus der Musterlösung, wenn der Arbeitsauftrag erfüllt ist.\n- Synonyme, plausible Praxisbeispiele und korrekte Ursache-Wirkungs-Ketten gelten.\n- Bei ausdrücklich verlangter Anzahl proportional nach fachlich unterschiedlichen richtigen Punkten bewerten.\n- Doppelte Punkte nur einmal zählen.\n- Falsche oder ausweichende Antworten 0 oder wenig Punkte. Teilrichtiges erhält echte Teilpunkte.\n- Eine knappe Antwort darf volle Punkte erhalten, wenn sie den Arbeitsauftrag vollständig erfüllt.\n- Bei "Nenne zwei" reichen zwei fachlich sinnvolle, unterschiedliche Schritte. Zusätzliche dritte richtige Schritte sind kein Nachteil.\n- Gib SCORE zwischen 0 und 100. REASON maximal zwei kurze Sätze. CONFIDENCE zwischen 0 und 1.`;
 
     const failures=[];
     for(const model of MODELS){
