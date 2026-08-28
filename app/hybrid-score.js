@@ -1,6 +1,13 @@
 import { scoreAnswerV07 } from './v07-utils';
 
 function wordCount(text=''){return String(text).trim().split(/\s+/).filter(Boolean).length}
+function detectRequestedCount(question=''){
+  const q=String(question).toLowerCase();
+  const words={eins:1,eine:1,einen:1,zwei:2,drei:3,vier:4,fünf:5,fuenf:5,sechs:6};
+  const m=q.match(/\b(?:nenne|nenn|gib|beschreibe|erkläre|erklaere|erläutere|erlaeutere)?\s*(eins|eine|einen|zwei|drei|vier|fünf|fuenf|sechs|[1-6])\b/);
+  if(!m)return null;
+  return /^\d$/.test(m[1])?Number(m[1]):(words[m[1]]||null);
+}
 function diag(local,message){
   const label=`⚙️ KI: ${String(message||'unbekannt').slice(0,180)}`;
   return {...local,ai:false,aiStatus:label,hits:[...(local.hits||[]),label]};
@@ -11,9 +18,10 @@ export async function scoreAnswerHybrid(answer,q,fallback){
   if(q?.type!=='free')return local;
 
   const words=wordCount(answer);
-  // Sehr kurze Antworten bleiben absichtlich lokal. Das wird sichtbar markiert,
-  // damit beim Testen klar ist, warum keine API-Anfrage stattgefunden hat.
-  if(words<4)return diag(local,'lokal, Antwort unter 4 Wörtern');
+  const explicitCount=detectRequestedCount(q?.question||'');
+  // Kurze Aufzählungen sind gerade bei "Nenne drei/vier ..." völlig normal.
+  // Nur extrem kurze offene Antworten ohne festen Zählauftrag bleiben lokal.
+  if(words<4&&!explicitCount)return diag(local,'lokal, sehr kurze offene Antwort');
 
   let timeout;
   try{
@@ -26,7 +34,7 @@ export async function scoreAnswerHybrid(answer,q,fallback){
         question:q.question,
         solution:q.solution,
         keywords:q.keywords||[],
-        requestedCount:q.minHits||null,
+        requestedCount:explicitCount||q.minHits||null,
         answer,
         localScore:local.score
       }),
