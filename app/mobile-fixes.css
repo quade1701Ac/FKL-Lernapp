@@ -3,18 +3,20 @@ html,body{max-width:100%;overflow-x:hidden}
 button,select,textarea,input{max-width:100%}
 
 @media(max-width:700px){
-  body{padding-top:58px}
-  main{width:100%;padding:0 14px 38px}
+  body{padding-top:calc(58px + env(safe-area-inset-top))}
+  main{width:100%;padding:0 14px calc(38px + env(safe-area-inset-bottom))}
   .topbar{height:60px;margin-bottom:22px}
   .brand{font-size:17px;white-space:nowrap}
   .brand em{font-size:9px;padding:3px 6px;margin-left:4px}
   .topRight{display:none}
 
   /* AuthGate account bar is inline-styled, so mobile overrides need !important. */
-  body>[style*="z-index: 50"]{left:8px!important;right:8px!important;top:8px!important;width:calc(100% - 16px)!important;min-height:42px!important;padding:5px 7px!important;border-radius:14px!important;gap:5px!important;justify-content:flex-end!important;overflow-x:auto!important;white-space:nowrap!important;scrollbar-width:none}
+  body>[style*="z-index: 50"]{left:8px!important;right:8px!important;top:calc(8px + env(safe-area-inset-top))!important;width:calc(100% - 16px)!important;min-height:44px!important;padding:5px 7px!important;border-radius:14px!important;gap:5px!important;justify-content:flex-end!important;overflow-x:auto!important;white-space:nowrap!important;scrollbar-width:none}
   body>[style*="z-index: 50"]::-webkit-scrollbar{display:none}
   body>[style*="z-index: 50"]>span{margin-right:auto;font-size:10px}
-  body>[style*="z-index: 50"] button{padding:6px 8px!important;font-size:10px!important;flex:0 0 auto}
+  body>[style*="z-index: 50"] button{padding:7px 9px!important;font-size:10px!important;min-height:32px!important;flex:0 0 auto}
+  /* Profilkarte unterhalb der Account-Bar halten und nie aus dem Viewport drücken. */
+  body>[style*="z-index: 60"]{left:8px!important;right:8px!important;top:calc(60px + env(safe-area-inset-top))!important;width:auto!important;max-height:calc(100dvh - 70px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;overflow-y:auto!important}
 
   .hero{display:block;margin:10px 0 22px}
   .hero h1{font-size:40px;line-height:1.02;margin:8px 0 13px}
@@ -48,9 +50,10 @@ button,select,textarea,input{max-width:100%}
   .sessionSide h2{font-size:18px;margin:6px 0 2px}
   .sessionSide p{margin:4px 0 8px}
   .sessionSide label{margin:14px 0 6px}
-  .back{margin-bottom:10px;min-height:36px}
+  .sessionSide select{font-size:16px;min-height:46px}
+  .back{margin-bottom:10px;min-height:40px}
   .modePills{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:12px}
-  .pill{padding:9px 5px;text-align:center;font-size:11px}
+  .pill{padding:10px 5px;text-align:center;font-size:11px;min-height:44px}
 
   .questionCard{min-height:0;padding:20px 16px;border-radius:16px}
   .questionMeta{font-size:9px;letter-spacing:.04em;gap:10px;align-items:flex-start}
@@ -65,12 +68,18 @@ button,select,textarea,input{max-width:100%}
   .primary,.secondary,.goodBtn,.badBtn,.reveal{min-height:46px;padding:12px 14px}
   .questionCard>.primary{width:100%}
   .feedback{padding:15px}
+  .scoreline{flex-wrap:wrap}
   .scoreline strong{font-size:26px}
-  .solution{padding:13px}
+  .solution{padding:13px;overflow-wrap:anywhere}
   .actions{flex-direction:column;width:100%}
   .actions button{width:100%}
   .flashArea{min-height:250px}
   .flashArea .solution{padding:18px}
+
+  .orderItem{min-width:0}
+  .orderItem strong{overflow-wrap:anywhere}
+  .orderButtons button{min-width:40px;min-height:38px}
+  .orderJump button{min-height:42px}
 
   .resultHero{padding:26px 15px;margin:24px auto}
   .resultHero h1{font-size:60px;margin:8px}
@@ -79,7 +88,7 @@ button,select,textarea,input{max-width:100%}
   .resultHero [style*="text-align: left"] .card{padding:14px!important}
 
   .gameShell{padding:14px 0!important}
-  .gameHead{align-items:flex-start}
+  .gameHead{align-items:flex-start;flex-wrap:wrap}
   .gameHead h1{font-size:25px}
   .gameHud{gap:6px;margin:14px 0}
   .gameHud div{padding:9px 5px}
@@ -90,14 +99,17 @@ button,select,textarea,input{max-width:100%}
   .gameControls>button,.gameControls div button{width:64px;height:50px}
 
   /* Generic protection for the four pause activities. */
-  .shiftShell,.tycoonShell,.documentShell,.purchasingShell{width:100%!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;padding-left:0!important;padding-right:0!important}
+  .shiftShell,.tycoonShell,.documentShell,.purchasingShell{width:100%!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;padding-left:0!important;padding-right:0!important;overflow-wrap:anywhere}
   .shiftShell button,.tycoonShell button,.documentShell button,.purchasingShell button{min-height:44px}
+  .shiftShell input,.shiftShell select,.tycoonShell input,.tycoonShell select,.documentShell input,.documentShell select,.purchasingShell input,.purchasingShell select{font-size:16px}
 }
 
 @media(max-width:430px){
-  body{padding-top:56px}
+  body{padding-top:calc(56px + env(safe-area-inset-top))}
   main{padding-left:10px;padding-right:10px}
   body>[style*="z-index: 50"]>span{display:none}
+  body>[style*="z-index: 50"]{justify-content:center!important}
+  body>[style*="z-index: 50"] button{padding-left:8px!important;padding-right:8px!important}
   .hero h1{font-size:35px}
   .heroStats{grid-template-columns:repeat(3,minmax(0,1fr))}
   .heroStats strong{font-size:20px}
@@ -108,4 +120,18 @@ button,select,textarea,input{max-width:100%}
   .questionCard h1{font-size:21px}
   .questionMeta{flex-wrap:wrap}
   .resultHero h1{font-size:52px}
+}
+
+@media(max-width:360px){
+  main{padding-left:8px;padding-right:8px}
+  .brand{font-size:16px}
+  .brand em{display:none}
+  .hero h1{font-size:32px}
+  .heroStats{padding:13px 6px}
+  .heroStats strong{font-size:18px}
+  .questionCard{padding:15px 11px}
+  .questionCard h1{font-size:20px}
+  .fieldProgressList button{grid-template-columns:minmax(0,1fr) 58px 34px}
+  .fpLabel small{max-width:120px}
+  .resultBreakdown div{min-width:60px}
 }
