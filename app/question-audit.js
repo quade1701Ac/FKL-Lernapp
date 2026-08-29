@@ -6,7 +6,9 @@ const EXCLUDED_IDS=new Set([
   'v08-7-11','v09-9-30','v09-9-34','v09-10-30','v09-10-34','v09-11-30','v09-11-34','v09-12-26',
   'qx-1-04','qx-6-02','qx-7-03','qr-9-03','qb13-1-08','qb13-1-12','qb13-2-10','qb14-9-06',
   // sehr einfache Alt-MC, deren Inhalt durch stärkere Aufgaben im Pool abgedeckt ist
-  'v05-1-11','v05-1-13','v05-2-11','v05-2-13','v05-2-20','v05-2-21','v06-5-01','v06-5-03','v06-5-06','v06-6-01','v06-6-02','v06-6-05','v06-7-01','v06-7-02','v06-8-01'
+  'v05-1-11','v05-1-13','v05-1-19','v05-1-25',
+  'v05-2-11','v05-2-13','v05-2-20','v05-2-21','v05-2-24',
+  'v06-5-01','v06-5-03','v06-5-06','v06-6-01','v06-6-02','v06-6-05','v06-7-01','v06-7-02','v06-8-01'
 ]);
 const TOPICS={1:new Set(['Warenannahme','Begleitpapiere','Mängel']),2:new Set(['Lagerarten','Bestände','Lagerkennzahlen']),3:new Set(['Verpackung','Kennzeichnung','Mehrwertleistungen']),4:new Set(['Fördermittel','Sicherheit','Transportwege']),5:new Set(['Kommissionierverfahren','Belege','Fehler']),6:new Set(['Packmittel','Verpackungsfunktionen','Kennzeichnung']),7:new Set(['Tourenplanung','Fahrzeuge','Wirtschaftlichkeit']),8:new Set(['Ladungssicherung','Lastverteilung','Ladeeinheiten']),9:new Set(['Versandarten','Frachtpapiere','KEP']),10:new Set(['KVP','Lean','Qualität']),11:new Set(['Beschaffung','Bestellverfahren','Lieferanten']),12:new Set(['Lagerkennzahlen','Kosten','Wirtschaftlichkeit'])};
 const STOP=new Set(['der','die','das','den','dem','des','ein','eine','einer','einem','einen','und','oder','ist','sind','wird','werden','was','wie','warum','welche','welcher','welches','bei','beim','mit','für','von','vor','nach','zu','zur','zum','auf','im','in','am','an','als','auch','nicht','du','drei','vier','zwei','nenn','nenne','erkläre','beschreibe']);
