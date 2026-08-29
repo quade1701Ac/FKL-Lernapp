@@ -26,4 +26,26 @@ export function smartPick(qs,limit,reviews={},stats={},randomShare=.35){
  const randomCount=Math.min(target,Math.max(1,Math.round(target*randomShare))),randomPart=shuffle(unique).slice(0,randomCount),chosen=[...randomPart],chosenIds=new Set(chosen.map(q=>String(q.id)));let pool=unique.filter(q=>!chosenIds.has(String(q.id)));
  while(chosen.length<target&&pool.length){const q=weightedPick(pool,reviews,stats);if(!q)break;chosen.push(q);const id=String(q.id);pool=pool.filter(x=>String(x.id)!==id)}return preparePicked(shuffle(chosen))
 }
+
+// Prüfungssimulation: nicht einfach 30 Zufallsfragen.
+// Sie deckt möglichst alle 12 Lernfelder ab und hält gleichzeitig einen Mix aus
+// Freitext, MC, Rechnen und Reihenfolge-Aufgaben. Fehlt ein Typ im Pool,
+// wird flexibel mit anderen geprüften Aufgaben aufgefüllt.
+export function examPick(qs,limit=30){
+ const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()],target=Math.min(limit,unique.length);if(target<=0)return[];
+ const chosen=[],ids=new Set(),typeCount={free:0,mc:0,number:0,order:0},fieldCount={};
+ const typeTargets={free:Math.round(target*.34),mc:Math.round(target*.33),number:Math.max(3,Math.round(target*.20)),order:Math.max(3,Math.round(target*.13))};
+ function add(q){if(!q||ids.has(String(q.id)))return false;chosen.push(q);ids.add(String(q.id));typeCount[q.type]=(typeCount[q.type]||0)+1;fieldCount[q.field]=(fieldCount[q.field]||0)+1;return true}
+ function bestFrom(pool){const ranked=shuffle(pool).sort((a,b)=>{const aType=(typeTargets[a.type]||0)-(typeCount[a.type]||0),bType=(typeTargets[b.type]||0)-(typeCount[b.type]||0);const aField=2-(fieldCount[a.field]||0),bField=2-(fieldCount[b.field]||0);const aDiff=Number(a.difficulty)||1,bDiff=Number(b.difficulty)||1;return (bField*4+bType*2+bDiff*.25)-(aField*4+aType*2+aDiff*.25)});return ranked[0]}
+ // Erst Grundabdeckung: nach Möglichkeit zwei Aufgaben aus jedem Lernfeld.
+ for(let field=1;field<=12&&chosen.length<target;field++){
+  for(let n=0;n<2&&chosen.length<target;n++){
+   const pool=unique.filter(q=>q.field===field&&!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool));
+  }
+ }
+ // Rest nach Typdefizit + noch unterrepräsentierten Lernfeldern auffüllen.
+ while(chosen.length<target){const pool=unique.filter(q=>!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool))}
+ return preparePicked(shuffle(chosen));
+}
+
 export function randomPick(qs,limit){const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];return preparePicked(shuffle(unique).slice(0,Math.min(limit,unique.length)))}
