@@ -16,6 +16,7 @@ import { balanceV13Questions } from './questions-balance-v13';
 import { balanceV14Questions } from './questions-balance-v14';
 import { orderV15Questions } from './questions-order-v15';
 import { lf1V101Questions } from './questions-lf1-v101';
+import { curriculumGapQuestions } from './questions-curriculum-gaps-v102';
 
 const NEAR_DUPLICATE_IDS = new Set([
   'qb14-7-01','qb14-7-04','qb14-8-01','qb14-8-02','qb14-8-04','qb14-9-02','qb14-9-07',
@@ -33,7 +34,7 @@ const allQuestions = [
   ...replacementLf5to12Questions,...expansionV12Questions,...qualityReplacementQuestions,
   ...qualityLf9to12Questions,...v10Batch1Questions,...v10CalculationQuestions,
   ...v10SituationQuestions1,...v10SituationQuestions2,...balanceV13Questions,...balanceV14Questions,
-  ...orderV15Questions,...lf1V101Questions,
+  ...orderV15Questions,...lf1V101Questions,...curriculumGapQuestions,
 ];
 
 const seenQuestionTexts = new Set();
