@@ -5,6 +5,7 @@ import './shift-simulator.css';
 import './warehouse-tycoon.css';
 import './document-workshop.css';
 import './purchasing-duel.css';
+import './mobile-fixes.css';
 import AuthGate from './AuthGate';
 
 export const metadata = {
