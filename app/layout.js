@@ -3,6 +3,7 @@ import './forklift-rush.css';
 import './order-question.css';
 import './shift-simulator.css';
 import './warehouse-tycoon.css';
+import './document-workshop.css';
 import AuthGate from './AuthGate';
 
 export const metadata = {
