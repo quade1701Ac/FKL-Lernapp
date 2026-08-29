@@ -1,12 +1,31 @@
 import { scoreAnswerV07 } from './v07-utils';
 
 function wordCount(text=''){return String(text).trim().split(/\s+/).filter(Boolean).length}
+function normalize(text=''){return String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
 function detectRequestedCount(question=''){
   const q=String(question).toLowerCase();
   const words={eins:1,eine:1,einen:1,zwei:2,drei:3,vier:4,fünf:5,fuenf:5,sechs:6};
   const m=q.match(/\b(?:nenne|nenn|gib|beschreibe|erkläre|erklaere|erläutere|erlaeutere)?\s*(eins|eine|einen|zwei|drei|vier|fünf|fuenf|sechs|[1-6])\b/);
   if(!m)return null;
   return /^\d$/.test(m[1])?Number(m[1]):(words[m[1]]||null);
+}
+const NON_ANSWER=/^(keine ahnung|keine idee|weiss ich nicht|weiß ich nicht|kp|ka|nichts|egal|keine antwort|keinen plan|keine plan|keine ahnung leider)$/;
+const HOSTILE_NONSENSE=/^(hallo|test|bla|blabla|lol|haha|keine lust|pizza|banane|kartoffel|weissbrot|asdf|qwertz|1234)$/;
+const CONTRADICTION=/\b(ignorieren|egal|einfach weiter|trotzdem einlagern|trotzdem verladen|ohne pruefung|ohne kontrolle|muss nicht pruefen|braucht man nicht)\b/;
+function hardZero(answer,local){
+  const text=normalize(answer);if(!text)return true;
+  if(NON_ANSWER.test(text)||HOSTILE_NONSENSE.test(text))return true;
+  if(CONTRADICTION.test(text)&&(local?.score||0)<=20)return true;
+  // Die KI darf offensichtlichen Unsinn ohne lokal erkannten fachlichen Inhalt nicht retten.
+  if(wordCount(answer)<=2&&(local?.score||0)===0)return true;
+  return false;
+}
+function shouldUseAi(local,answer,explicitCount){
+  const score=Number(local?.score)||0,words=wordCount(answer);
+  // Klare lokale Ergebnisse bleiben lokal. Die KI ist nur Zweitprüfer für Grauzonen.
+  if(score<=20||score>=80)return false;
+  if(words<4&&!explicitCount)return false;
+  return true;
 }
 function diag(local,message){
   const label=`⚙️ KI: ${String(message||'unbekannt').slice(0,180)}`;
@@ -17,11 +36,9 @@ export async function scoreAnswerHybrid(answer,q,fallback){
   const local=scoreAnswerV07(answer,q,fallback);
   if(q?.type!=='free')return local;
 
-  const words=wordCount(answer);
   const explicitCount=detectRequestedCount(q?.question||'');
-  // Kurze Aufzählungen sind gerade bei "Nenne drei/vier ..." völlig normal.
-  // Nur extrem kurze offene Antworten ohne festen Zählauftrag bleiben lokal.
-  if(words<4&&!explicitCount)return diag(local,'lokal, sehr kurze offene Antwort');
+  if(hardZero(answer,local))return {...local,score:0,ai:false,aiStatus:'⚙️ KI: nicht nötig · klare Nullantwort'};
+  if(!shouldUseAi(local,answer,explicitCount))return diag(local,local.score>=80?'lokal eindeutig richtig':local.score<=20?'lokal eindeutig falsch':'lokal, sehr kurze offene Antwort');
 
   let timeout;
   try{
@@ -51,9 +68,15 @@ export async function scoreAnswerHybrid(answer,q,fallback){
     if(!Number.isFinite(Number(data?.score)))return diag(local,'fehlgeschlagen: ungültiger KI-Score');
 
     const model=String(data.model||'Groq');
+    const aiScore=Math.max(0,Math.min(100,Math.round(Number(data.score)/10)*10));
+    // Zweitprüfer statt Alleinherrscher: bei extremem Widerspruch zwischen lokalem
+    // und KI-Urteil wird konservativ gemittelt. So kann ein einzelnes Modell keine
+    // 40%-Antwort plötzlich auf 100% katapultieren.
+    const gap=Math.abs(aiScore-local.score);
+    const finalScore=gap>=50?Math.round(((aiScore+local.score)/2)/10)*10:aiScore;
     return {
       ...local,
-      score:Math.max(0,Math.min(100,Math.round(Number(data.score)/10)*10)),
+      score:Math.max(0,Math.min(100,finalScore)),
       ai:true,
       aiStatus:`⚙️ KI: aktiv · ${model}`,
       aiReason:String(data.reason||'').slice(0,240),
