@@ -27,28 +27,32 @@ export function smartPick(qs,limit,reviews={},stats={},randomShare=.35){
  while(chosen.length<target&&pool.length){const q=weightedPick(pool,reviews,stats);if(!q)break;chosen.push(q);const id=String(q.id);pool=pool.filter(x=>String(x.id)!==id)}return preparePicked(shuffle(chosen))
 }
 
-// Prüfungssimulation: nicht einfach 30 Zufallsfragen.
-// Möglichst alle 12 Lernfelder werden abgedeckt. Danach wird nach Aufgabentypen
-// ausbalanciert: Freitext, Multiple Choice, Rechnen und Reihenfolge.
+// Prüfungssimulation: 30 Aufgaben werden bewusst verteilt statt nur ausgelost.
+// Ziel bei 30 Aufgaben: jedes LF mindestens 2x, kein LF mehr als 3x (sofern der Pool
+// das zulässt) und eine breite Mischung aus Freitext, MC, Rechnen und Reihenfolge.
 export function examPick(qs,limit=30){
  const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()],target=Math.min(limit,unique.length);if(target<=0)return[];
  const chosen=[],ids=new Set(),typeCount={free:0,mc:0,number:0,order:0},fieldCount={};
  const typeTargets={free:Math.round(target*.34),mc:Math.round(target*.33),number:Math.max(3,Math.round(target*.20)),order:Math.max(3,Math.round(target*.13))};
+ const maxPerField=target>=24?Math.ceil(target/12):Math.ceil(target/Math.min(12,target));
  function add(q){if(!q||ids.has(String(q.id)))return false;chosen.push(q);ids.add(String(q.id));typeCount[q.type]=(typeCount[q.type]||0)+1;fieldCount[q.field]=(fieldCount[q.field]||0)+1;return true}
- function bestFrom(pool){const ranked=shuffle(pool).sort((a,b)=>{const aType=(typeTargets[a.type]||0)-(typeCount[a.type]||0),bType=(typeTargets[b.type]||0)-(typeCount[b.type]||0);const aField=2-(fieldCount[a.field]||0),bField=2-(fieldCount[b.field]||0);const aDiff=Number(a.difficulty)||1,bDiff=Number(b.difficulty)||1;return (bField*4+bType*2+bDiff*.25)-(aField*4+aType*2+aDiff*.25)});return ranked[0]}
- for(let field=1;field<=12&&chosen.length<target;field++){
-  for(let n=0;n<2&&chosen.length<target;n++){
-   const pool=unique.filter(q=>q.field===field&&!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool));
-  }
+ function scoreCandidate(q){const typeNeed=Math.max(0,(typeTargets[q.type]||0)-(typeCount[q.type]||0));const fieldNeed=Math.max(0,2-(fieldCount[q.field]||0));const diff=Number(q.difficulty)||1;return fieldNeed*12+typeNeed*2+Math.min(4,diff)*.2+Math.random()*.1}
+ function bestFrom(pool){return pool.reduce((best,q)=>!best||scoreCandidate(q)>scoreCandidate(best)?q:best,null)}
+ // Runde 1 + 2: jedes Lernfeld bekommt nach Möglichkeit zwei Aufgaben. Dabei wird
+ // bereits auf die noch fehlenden Aufgabentypen geachtet.
+ for(let round=0;round<2;round++)for(let field=1;field<=12&&chosen.length<target;field++){
+  const pool=unique.filter(q=>q.field===field&&!ids.has(String(q.id)));if(pool.length)add(bestFrom(pool));
  }
- while(chosen.length<target){const pool=unique.filter(q=>!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool))}
+ // Restplätze: zunächst max. 3 Aufgaben pro LF. Das verhindert insbesondere, dass
+ // viele Rechenaufgaben aus LF12 die Prüfung dominieren.
+ while(chosen.length<target){let pool=unique.filter(q=>!ids.has(String(q.id))&&(fieldCount[q.field]||0)<maxPerField);if(!pool.length)pool=unique.filter(q=>!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool))}
  return preparePicked(shuffle(chosen));
 }
 
+// Kleine Diagnosehilfe für Tests/Entwicklung. Verändert keine Fragen.
+export function examComposition(list=[]){const fields={},types={};for(const q of list){fields[q.field]=(fields[q.field]||0)+1;types[q.type]=(types[q.type]||0)+1}return{size:list.length,fields,types,minField:Math.min(...Object.values(fields),0),maxField:Math.max(...Object.values(fields),0)}}
+
 export function randomPick(qs,limit){
- // Die App ruft für die 30-Fragen-Prüfung bisher randomPick auf. Ab 30 Aufgaben
- // wird deshalb automatisch die prüfungsbalancierte Auswahl verwendet. Fehlertraining
- // und kleinere Zufallssessions bleiben echte Zufallsauswahlen.
  if(limit>=30)return examPick(qs,limit);
  const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];return preparePicked(shuffle(unique).slice(0,Math.min(limit,unique.length)));
 }
