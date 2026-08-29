@@ -28,24 +28,27 @@ export function smartPick(qs,limit,reviews={},stats={},randomShare=.35){
 }
 
 // Prüfungssimulation: nicht einfach 30 Zufallsfragen.
-// Sie deckt möglichst alle 12 Lernfelder ab und hält gleichzeitig einen Mix aus
-// Freitext, MC, Rechnen und Reihenfolge-Aufgaben. Fehlt ein Typ im Pool,
-// wird flexibel mit anderen geprüften Aufgaben aufgefüllt.
+// Möglichst alle 12 Lernfelder werden abgedeckt. Danach wird nach Aufgabentypen
+// ausbalanciert: Freitext, Multiple Choice, Rechnen und Reihenfolge.
 export function examPick(qs,limit=30){
  const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()],target=Math.min(limit,unique.length);if(target<=0)return[];
  const chosen=[],ids=new Set(),typeCount={free:0,mc:0,number:0,order:0},fieldCount={};
  const typeTargets={free:Math.round(target*.34),mc:Math.round(target*.33),number:Math.max(3,Math.round(target*.20)),order:Math.max(3,Math.round(target*.13))};
  function add(q){if(!q||ids.has(String(q.id)))return false;chosen.push(q);ids.add(String(q.id));typeCount[q.type]=(typeCount[q.type]||0)+1;fieldCount[q.field]=(fieldCount[q.field]||0)+1;return true}
  function bestFrom(pool){const ranked=shuffle(pool).sort((a,b)=>{const aType=(typeTargets[a.type]||0)-(typeCount[a.type]||0),bType=(typeTargets[b.type]||0)-(typeCount[b.type]||0);const aField=2-(fieldCount[a.field]||0),bField=2-(fieldCount[b.field]||0);const aDiff=Number(a.difficulty)||1,bDiff=Number(b.difficulty)||1;return (bField*4+bType*2+bDiff*.25)-(aField*4+aType*2+aDiff*.25)});return ranked[0]}
- // Erst Grundabdeckung: nach Möglichkeit zwei Aufgaben aus jedem Lernfeld.
  for(let field=1;field<=12&&chosen.length<target;field++){
   for(let n=0;n<2&&chosen.length<target;n++){
    const pool=unique.filter(q=>q.field===field&&!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool));
   }
  }
- // Rest nach Typdefizit + noch unterrepräsentierten Lernfeldern auffüllen.
  while(chosen.length<target){const pool=unique.filter(q=>!ids.has(String(q.id)));if(!pool.length)break;add(bestFrom(pool))}
  return preparePicked(shuffle(chosen));
 }
 
-export function randomPick(qs,limit){const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];return preparePicked(shuffle(unique).slice(0,Math.min(limit,unique.length)))}
+export function randomPick(qs,limit){
+ // Die App ruft für die 30-Fragen-Prüfung bisher randomPick auf. Ab 30 Aufgaben
+ // wird deshalb automatisch die prüfungsbalancierte Auswahl verwendet. Fehlertraining
+ // und kleinere Zufallssessions bleiben echte Zufallsauswahlen.
+ if(limit>=30)return examPick(qs,limit);
+ const checked=checkedPool(qs),unique=[...new Map(checked.map(q=>[String(q.id),q])).values()];return preparePicked(shuffle(unique).slice(0,Math.min(limit,unique.length)));
+}
