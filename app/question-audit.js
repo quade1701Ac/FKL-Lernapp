@@ -3,7 +3,10 @@
 // triviale MC-Aufgaben sowie semantisch sehr ähnliche Fragen.
 const EXCLUDED_IDS=new Set([
   'v08-5-11','v08-5-15','v08-5-21','v08-5-25','v08-6-11','v08-6-13','v08-6-17','v08-6-21','v08-6-25',
-  'v08-7-11','v09-9-30','v09-9-34','v09-10-30','v09-10-34','v09-11-30','v09-11-34','v09-12-26',
+  'v08-7-11','v09-9-28','v09-9-30','v09-9-32','v09-9-34',
+  'v09-10-26','v09-10-28','v09-10-30','v09-10-32','v09-10-34',
+  'v09-11-26','v09-11-28','v09-11-30','v09-11-32','v09-11-34',
+  'v09-12-26','v09-12-28',
   'qx-1-04','qx-6-02','qx-7-03','qr-9-03','qb13-1-08','qb13-1-12','qb13-2-10','qb14-9-06',
   // sehr einfache Altfragen, deren Inhalt durch stärkere Aufgaben im Pool abgedeckt ist
   'v05-1-11','v05-1-13','v05-1-19','v05-1-25',
@@ -24,7 +27,7 @@ function tooEasy(q){
   if(q.type!=='mc')return false;
   const text=norm(q.question),d=Number(q.difficulty)||1;
   if(d<=1&&/wofuer steht|was bedeutet|welches beispiel|was ist ein|welcher vorteil|welche kontrolle|wozu dient|was bezeichnet|welche information/.test(text))return true;
-  const absurd=(q.options||[]).filter(o=>/lieblingsfarbe|lohnsteuer|urlaubsplanung|bilanzsumme|radioleistung|sitzbezug|arbeitsvertrag|pausenraum|automatisch billiger|verkaufspreis|private handynummer|private telefonnummer|nur roboter|irgendwann am tag|zufaellige reihenfolge|ungueltig machen|bewusst falsch|ohne kontrolle/.test(norm(o))).length;
+  const absurd=(q.options||[]).filter(o=>/lieblingsfarbe|lohnsteuer|urlaubsplanung|bilanzsumme|radioleistung|sitzbezug|arbeitsvertrag|pausenraum|automatisch billiger|verkaufspreis|private handynummer|private telefonnummer|nur roboter|irgendwann am tag|zufaellige reihenfolge|ungueltig machen|bewusst falsch|ohne kontrolle|farbe des kartons|name des packers|adresse entfaellt|verpackung ersetzt|zahlen groesser|einzelwerte verboten|bestand wird null|lagerregale|kommissionierweg/.test(norm(o))).length;
   return d<=2&&absurd>=2;
 }
 export function finalAuditQuestions(source=[]){const out=[],ids=new Set(),texts=new Set();for(const q of source){if(EXCLUDED_IDS.has(String(q.id))||!validShape(q)||!validTopic(q)||tooEasy(q))continue;const id=String(q.id),text=norm(q.question);if(ids.has(id)||texts.has(text))continue;const duplicate=out.some(old=>old.field===q.field&&old.topic===q.topic&&old.type===q.type&&similarity(old.question,q.question)>=.88);if(duplicate)continue;ids.add(id);texts.add(text);out.push(q)}return out}
