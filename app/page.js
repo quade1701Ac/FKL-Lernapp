@@ -22,7 +22,7 @@ const MODES=[
 {id:'weak',label:'Schwachstellen',icon:'🎯',desc:'20 stark auf Schwächen fokussierte Fragen'},
 {id:'mistakes',label:'Meine Fehler',icon:'❌',desc:'Bis zu 20 zuletzt falsch beantwortete Fragen gezielt wiederholen'},
 {id:'exam',label:'Prüfung',icon:'⏱️',desc:'30 Fragen · Auswertung erst am Ende'},
-{id:'game',label:'Pause',icon:'🎮',desc:'45 Sekunden Stapler Rush · einfach abschalten'}];
+{id:'game',label:'Praxiswelt',icon:'🎮',desc:'Spiele · Simulationen · praxisnahe Logistikaufgaben'}];
 const STATS_KEY='lagerlogik-v07-stats',REVIEW_KEY='lagerlogik-v07-review';
 function load(k,f){if(typeof window==='undefined')return f;try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}}
 function qKey(q){return q.id}
