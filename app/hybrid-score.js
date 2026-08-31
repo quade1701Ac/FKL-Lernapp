@@ -76,7 +76,10 @@ export async function scoreAnswerHybrid(answer,q,fallback){
         question:q.question,
         solution:q.solution,
         keywords:q.keywords||[],
-        requestedCount:explicitCount||q.minHits||null,
+        // Nur eine von der Frage ausdrücklich verlangte Anzahl an die KI geben.
+        // minHits ist eine interne Hilfe für den lokalen Keyword-Scorer und darf
+        // aus einer offenen „Wie könntest du ...?“-Frage keinen Zählauftrag machen.
+        requestedCount:explicitCount,
         answer,
         localScore:local.score
       }),
