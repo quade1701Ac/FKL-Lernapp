@@ -31,9 +31,13 @@ function scoreNumber(answer,q,fallback){
 function detectRequestedCount(question=''){
   const q=String(question).toLowerCase();
   const words={eins:1,eine:1,einen:1,zwei:2,drei:3,vier:4,fünf:5,fuenf:5,sechs:6};
-  const m=q.match(/\b(?:nenne|nenn|gib|beschreibe|erkläre|erklaere|erläutere|erlaeutere)?\s*(eins|eine|einen|zwei|drei|vier|fünf|fuenf|sechs|[1-6])\b/);
-  if(!m)return null;
-  return /^\d$/.test(m[1])?Number(m[1]):(words[m[1]]||null);
+  // Ein Zahlwort zählt nur dann als Arbeitsauftrag, wenn es an ein passendes Verb
+  // oder an ein echtes Aufzählungs-Substantiv gebunden ist. Artikel wie
+  // „eine Lieferung“ dürfen niemals versehentlich zu „nenne 1 Punkt“ werden.
+  const direct=q.match(/\b(?:nenne|nenn|gib|beschreibe|erkläre|erklaere|erläutere|erlaeutere|zeige|formuliere)\s+(?:je\s+)?(eins|eine|einen|zwei|drei|vier|fünf|fuenf|sechs|[1-6])\b/)
+    ||q.match(/\b(eins|eine|einen|zwei|drei|vier|fünf|fuenf|sechs|[1-6])\s+(?:weitere\s+|mögliche\s+|moegliche\s+)?(?:punkte|gründe|gruende|kriterien|beispiele|ursachen|folgen|schritte|informationen|angaben|kennzahlen|größen|groessen|belastungen|möglichkeiten|moeglichkeiten|maßnahmen|massnahmen|vorteile|nachteile|risiken|faktoren|anforderungen|fehler|kostenarten)\b/);
+  if(!direct)return null;
+  return /^\d$/.test(direct[1])?Number(direct[1]):(words[direct[1]]||null);
 }
 const NON_ANSWER=/^(keine ahnung|keine idee|weiss ich nicht|weiß ich nicht|kp|ka|nichts|egal|keine antwort|keinen plan|keine plan|keine ahnung leider)$/;
 const HOSTILE_NONSENSE=/^(hallo|test|bla|blabla|lol|haha|keine lust|pizza|banane|kartoffel|weissbrot|asdf|qwertz|1234)$/;
@@ -53,7 +57,7 @@ function shouldUseAi(local,answer,explicitCount){
 }
 function diag(local,message){
   const label=`⚙️ KI: ${String(message||'unbekannt').slice(0,180)}`;
-  return {...local,ai:false,aiStatus:label,hits:[...(local.hits||[]),label]};
+  return {...local,ai:false,aiStatus:label,hits:[...(local.hits||[])]};
 }
 
 export async function scoreAnswerHybrid(answer,q,fallback){
@@ -106,7 +110,7 @@ export async function scoreAnswerHybrid(answer,q,fallback){
       aiStatus:`⚙️ KI: aktiv · ${model}`,
       aiReason:String(data.reason||'').slice(0,240),
       confidence:Number(data.confidence)||0,
-      hits:[...(local.hits||[]),`⚙️ KI: aktiv · ${model}`]
+      hits:[...(local.hits||[])]
     };
   }catch(error){
     if(timeout)clearTimeout(timeout);
