@@ -16,12 +16,37 @@ const EXCLUDED_IDS=new Set([
   'v06-7-01','v06-7-02','v06-7-06','v06-7-08','v06-7-09',
   'v06-8-01'
 ]);
-const TOPICS={1:new Set(['Warenannahme','Begleitpapiere','Mängel']),2:new Set(['Lagerarten','Bestände','Lagerkennzahlen']),3:new Set(['Verpackung','Kennzeichnung','Mehrwertleistungen']),4:new Set(['Fördermittel','Sicherheit','Transportwege']),5:new Set(['Kommissionierverfahren','Belege','Fehler']),6:new Set(['Packmittel','Verpackungsfunktionen','Kennzeichnung']),7:new Set(['Tourenplanung','Fahrzeuge','Wirtschaftlichkeit']),8:new Set(['Ladungssicherung','Lastverteilung','Ladeeinheiten']),9:new Set(['Versandarten','Frachtpapiere','KEP']),10:new Set(['KVP','Lean','Qualität']),11:new Set(['Beschaffung','Bestellverfahren','Lieferanten']),12:new Set(['Lagerkennzahlen','Kosten','Wirtschaftlichkeit'])};
+const TOPICS={
+  1:new Set(['Warenannahme','Begleitpapiere','Mängel']),
+  2:new Set(['Lagerarten','Bestände','Lagerkennzahlen']),
+  3:new Set(['Verpackung','Kennzeichnung','Mehrwertleistungen']),
+  4:new Set(['Fördermittel','Sicherheit','Transportwege']),
+  5:new Set(['Kommissionierverfahren','Belege','Fehler']),
+  6:new Set(['Packmittel','Verpackungsfunktionen','Kennzeichnung']),
+  7:new Set(['Tourenplanung','Fahrzeuge','Wirtschaftlichkeit']),
+  8:new Set(['Ladungssicherung','Lastverteilung','Ladeeinheiten']),
+  9:new Set(['Versandarten','Frachtpapiere','KEP']),
+  10:new Set(['KVP','Lean','Qualität']),
+  11:new Set(['Beschaffung','Bestellverfahren','Lieferanten']),
+  12:new Set(['Lagerkennzahlen','Kosten','Wirtschaftlichkeit']),
+  13:new Set(['Ausbildung & Arbeitsrecht','Sozialversicherung','Mitbestimmung & Tarif','Wirtschaft','Unternehmen & Recht','Nachhaltigkeit & Arbeitsschutz'])
+};
+const TOPIC_ALIASES={
+  1:{Dokumente:'Begleitpapiere',Kontrolle:'Warenannahme'},
+  2:{Lagerung:'Lagerarten'},
+  3:{VAS:'Mehrwertleistungen'},
+  4:{Flurförderzeuge:'Fördermittel',Arbeitssicherheit:'Sicherheit',Transportmittel:'Fördermittel'},
+  5:{Kommissionierleistung:'Kommissionierverfahren'},
+  7:{Fahrzeugauslastung:'Wirtschaftlichkeit'},
+  8:{Zurrmittel:'Ladungssicherung',Reibung:'Ladungssicherung',Formschluss:'Ladungssicherung',Verladung:'Ladungssicherung'},
+  9:{Spedition:'Versandarten',Versandkosten:'Versandarten'}
+};
+function normalizeTopicQuestion(q){const mapped=TOPIC_ALIASES[q?.field]?.[q?.topic];return mapped?{...q,topic:mapped}:q}
 const STOP=new Set(['der','die','das','den','dem','des','ein','eine','einer','einem','einen','und','oder','ist','sind','wird','werden','was','wie','warum','welche','welcher','welches','bei','beim','mit','für','von','vor','nach','zu','zur','zum','auf','im','in','am','an','als','auch','nicht','du','drei','vier','zwei','nenn','nenne','erkläre','beschreibe']);
 function norm(s=''){return String(s).toLowerCase().replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
 function tokens(s=''){return new Set(norm(s).split(' ').filter(x=>x.length>3&&!STOP.has(x)))}
 function similarity(a,b){const A=tokens(a),B=tokens(b);if(!A.size||!B.size)return 0;let hit=0;A.forEach(x=>{if(B.has(x))hit++});return hit/Math.min(A.size,B.size)}
-function validShape(q){if(!q||!q.id||!q.question||!Number.isInteger(q.field)||q.field<1||q.field>12)return false;if(!['free','mc','number','order'].includes(q.type))return false;if(q.type==='mc'){if(!Array.isArray(q.options)||q.options.length<3||!Array.isArray(q.correct)||!q.correct.length||q.correct.some(i=>i<0||i>=q.options.length))return false;const opts=q.options.map(norm);if(new Set(opts).size!==opts.length)return false}if(q.type==='order'&&(!Array.isArray(q.items)||q.items.length<3||new Set(q.items.map(norm)).size!==q.items.length))return false;if(q.type==='number'&&!Number.isFinite(Number(q.answer)))return false;if(q.type==='free'&&(!Array.isArray(q.keywords)||!q.keywords.length||!q.solution))return false;return true}
+function validShape(q){if(!q||!q.id||!q.question||!Number.isInteger(q.field)||q.field<1||q.field>13)return false;if(!['free','mc','number','order'].includes(q.type))return false;if(q.type==='mc'){if(!Array.isArray(q.options)||q.options.length<3||!Array.isArray(q.correct)||!q.correct.length||q.correct.some(i=>i<0||i>=q.options.length))return false;const opts=q.options.map(norm);if(new Set(opts).size!==opts.length)return false}if(q.type==='order'&&(!Array.isArray(q.items)||q.items.length<3||new Set(q.items.map(norm)).size!==q.items.length))return false;if(q.type==='number'&&!Number.isFinite(Number(q.answer)))return false;if(q.type==='free'&&(!Array.isArray(q.keywords)||!q.keywords.length||!q.solution))return false;return true}
 function validTopic(q){return TOPICS[q.field]?.has(q.topic)}
 function tooEasy(q){
   if(q.type!=='mc')return false;
@@ -30,4 +55,4 @@ function tooEasy(q){
   const absurd=(q.options||[]).filter(o=>/lieblingsfarbe|lohnsteuer|urlaubsplanung|bilanzsumme|radioleistung|sitzbezug|arbeitsvertrag|pausenraum|automatisch billiger|verkaufspreis|private handynummer|private telefonnummer|nur roboter|irgendwann am tag|zufaellige reihenfolge|ungueltig machen|bewusst falsch|ohne kontrolle|farbe des kartons|name des packers|adresse entfaellt|verpackung ersetzt|zahlen groesser|einzelwerte verboten|bestand wird null|lagerregale|kommissionierweg/.test(norm(o))).length;
   return d<=2&&absurd>=2;
 }
-export function finalAuditQuestions(source=[]){const out=[],ids=new Set(),texts=new Set();for(const q of source){if(EXCLUDED_IDS.has(String(q.id))||!validShape(q)||!validTopic(q)||tooEasy(q))continue;const id=String(q.id),text=norm(q.question);if(ids.has(id)||texts.has(text))continue;const duplicate=out.some(old=>old.field===q.field&&old.topic===q.topic&&old.type===q.type&&similarity(old.question,q.question)>=.88);if(duplicate)continue;ids.add(id);texts.add(text);out.push(q)}return out}
+export function finalAuditQuestions(source=[]){const out=[],ids=new Set(),texts=new Set();for(const raw of source){const q=normalizeTopicQuestion(raw);if(EXCLUDED_IDS.has(String(q.id))||!validShape(q)||!validTopic(q)||tooEasy(q))continue;const id=String(q.id),text=norm(q.question);if(ids.has(id)||texts.has(text))continue;const duplicate=out.some(old=>old.field===q.field&&old.topic===q.topic&&old.type===q.type&&similarity(old.question,q.question)>=.88);if(duplicate)continue;ids.add(id);texts.add(text);out.push(q)}return out}
