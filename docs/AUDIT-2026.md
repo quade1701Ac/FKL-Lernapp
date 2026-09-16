@@ -1,5 +1,42 @@
 # LagerLogik: Prüfung und Korrekturen vom 16.09.2026
 
+## Nachtrag: unmittelbare Annahme und Feinkontrolle
+
+Die Rückmeldung zur Aufgabe `sit1-1-01` zeigte einen zu unscharfen
+Arbeitsauftrag. Die überarbeitete Frage bestätigt den bereits erledigten
+Mengen-/Identitätsabgleich und fragt ausdrücklich nach Schadensabsicherung
+bei anwesendem Fahrer und Behandlung der Kartons bis zur späteren Feinkontrolle.
+Musterlösung und allgemeine KI-Systemregeln trennen diese Prozessabschnitte.
+Fachlich notwendige Schritte im tatsächlich gefragten Abschnitt bleiben Pflicht.
+Weder eine bestimmte Nutzerantwort noch eine Frage-ID erhält Sonderpunkte.
+
+Bei Ablauf-Fragen reicht ein hoher lokaler Keyword-Score nicht mehr aus,
+um die KI-Zweitprüfung zu überspringen. Lokale Teilbewertungen werden ebenfalls
+geprüft. Dadurch sind zusätzliche KI-Aufrufe und Wartezeiten möglich; bei
+Anbieterfehlern bleibt die gekennzeichnete lokale Ersatzbewertung bestehen.
+
+Validierung des Code-Commits `888fa94`: 23 Logiktests, 4 Komponententests und
+Build lokal sowie auf GitHub erfolgreich; Netlify-Vorschau erfolgreich.
+Die folgenden sieben Live-Fälle liefen durch `scoreAnswerHybrid` einschließlich
+der echten Vorschau-API, jeweils mit `openai/gpt-oss-120b`:
+
+| Antwortvariante | Punkte |
+|---|---:|
+| Original: Frachtbrief, Fotos, Fahrerbestätigung, Sperrlager | 100 |
+| Gleichwertige Formulierung mit Quarantäne, ohne Fotos | 100 |
+| Nur Sperrlager, keine Schadensdokumentation | 50 |
+| Nur Dokumentation, keine Absicherung der Kartons | 50 |
+| Schaden ignorieren und alles freigeben | 0 |
+| Dokumentieren, aber beschädigte Kartons sofort freigeben | 50 |
+| Nur Annahmeschritte, obwohl ausdrücklich Feinkontrolle gefragt | 0 |
+
+Reproduzierbar über `scripts/check-receiving-live.mjs <preview-url>`;
+die Live-Prüfung wird bewusst nicht automatisch in CI ausgeführt.
+Die Stichprobe ist keine Garantie identischer KI-Urteile bei jedem Aufruf.
+Der Browserzugriff funktioniert wieder; die Vorschau zeigt die Loginseite.
+Echter Login/Cloud-Abgleich bleibt bis zur sicheren Anmeldung offen.
+Produktionsstand und bestehende Lernbewertungen wurden nicht verändert.
+
 Status: geprüfter Entwicklungsstand, noch nicht für die Produktion freigegeben.
 
 ## Umfang und Ergebnis
