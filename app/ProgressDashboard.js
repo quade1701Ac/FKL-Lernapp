@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from './supabase-client';
+import { loadAnswerHistory, localDayKey, learningStreak } from './history';
 import { learningFields } from './data';
 import './progress-dashboard.css';
 
@@ -12,7 +13,7 @@ const DAY=86400000;
 
 export default function ProgressDashboard({onClose}){
  const [rows,setRows]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState('');
- useEffect(()=>{let active=true;(async()=>{setLoading(true);const {data:{user}}=await supabase.auth.getUser();if(!user){if(active){setRows([]);setLoading(false)}return}const {data,error}=await supabase.from('answer_history').select('question_id,field,topic,score,created_at').eq('user_id',user.id).order('created_at',{ascending:false});if(!active)return;if(error)setError(error.message);else setRows(data||[]);setLoading(false)})();return()=>{active=false}},[]);
+ useEffect(()=>{let active=true;(async()=>{try{const {data:{user}}=await supabase.auth.getUser();if(!user)return;const data=await loadAnswerHistory(supabase,user.id);if(active)setRows(data)}catch(error){if(active)setError(error.message)}finally{if(active)setLoading(false)}})();return()=>{active=false}},[]);
  const stats=useMemo(()=>{
   const fields={},topics={};let sum=0;
   for(const r of rows){const score=Number(r.score)||0,field=Number(r.field);sum+=score;fields[field]||={sum:0,count:0};fields[field].sum+=score;fields[field].count++;const key=`${field}|||${r.topic||'Ohne Thema'}`;topics[key]||={field,topic:r.topic||'Ohne Thema',sum:0,count:0};topics[key].sum+=score;topics[key].count++}
@@ -27,9 +28,8 @@ export default function ProgressDashboard({onClose}){
   const recentAvg=avgOf(recent),previousAvg=avgOf(previous),trend=recentAvg!=null&&previousAvg!=null?recentAvg-previousAvg:null;
   const latest={};for(const r of rows){if(!r.question_id)continue;if(!latest[r.question_id]||new Date(r.created_at)>new Date(latest[r.question_id].created_at))latest[r.question_id]=r}
   const openMistakes=Object.values(latest).filter(r=>(Number(r.score)||0)<60).length;
-  const dayKeys=[...new Set(rows.map(r=>new Date(r.created_at).toISOString().slice(0,10)))].sort().reverse();let streak=0;
-  if(dayKeys.length){let cursor=new Date();cursor.setHours(0,0,0,0);const today=cursor.toISOString().slice(0,10),yesterday=new Date(cursor.getTime()-DAY).toISOString().slice(0,10);if(dayKeys.includes(today)||dayKeys.includes(yesterday)){if(!dayKeys.includes(today))cursor=new Date(cursor.getTime()-DAY);while(dayKeys.includes(cursor.toISOString().slice(0,10))){streak++;cursor=new Date(cursor.getTime()-DAY)}}}
-  const activeDays7=new Set(recent.map(r=>new Date(r.created_at).toISOString().slice(0,10))).size;
+  const streak=learningStreak(rows);
+  const activeDays7=new Set(recent.map(r=>localDayKey(r.created_at)).filter(Boolean)).size;
   return{overall,fieldRows,strongest,weakest,weakTopics,recentCount:recent.length,recentAvg,previousAvg,trend,openMistakes,streak,activeDays7};
  },[rows]);
  if(loading)return <div className="pd-overlay"><section className="pd-shell"><p className="pd-copy">☁️ Lernstand wird geladen …</p></section></div>;

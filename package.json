@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
+    "test:ui": "node --import ./tests/register-ui.mjs --test tests/ui/*.test.mjs",
+    "audit:questions": "node --import ./tests/register.mjs scripts/audit-questions.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
@@ -14,5 +17,7 @@
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "react-test-renderer": "^19.1.1"
+  }
 }

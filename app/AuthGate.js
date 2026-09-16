@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase-client';
 import ProgressDashboard from './ProgressDashboard';
+import { buildStats as cloudStatsFromRows, buildReviews as cloudReviewsFromRows, loadAnswerHistory } from './history';
 
 const STATS_KEY='lagerlogik-v07-stats';
 const REVIEW_KEY='lagerlogik-v07-review';
@@ -15,37 +16,6 @@ function safeLoad(key,fallback={}){
 
 function answeredCount(stats){
   return Object.values(stats||{}).reduce((n,s)=>n+(s?.answered||0),0);
-}
-
-function buildStats(rows){
-  const stats={};
-  for(const row of rows){
-    const field=Number(row.field);
-    if(!field) continue;
-    const topic=row.topic||'Sonstiges';
-    const score=Number(row.score)||0;
-    const current=stats[field]||{answered:0,points:0,correct:0,topics:{}};
-    const tp=current.topics[topic]||{answered:0,points:0};
-    stats[field]={...current,answered:current.answered+1,points:current.points+score,correct:current.correct+(score>=60?1:0),topics:{...current.topics,[topic]:{answered:tp.answered+1,points:tp.points+score}}};
-  }
-  return stats;
-}
-
-function buildReviews(rows){
-  const latest={};
-  for(const row of rows){
-    if(!row.question_id) continue;
-    const old=latest[row.question_id];
-    if(!old||new Date(row.answered_at)>new Date(old.answered_at)) latest[row.question_id]=row;
-  }
-  const now=Date.now(), reviews={};
-  for(const [id,row] of Object.entries(latest)){
-    const score=Number(row.score)||0;
-    const box=score>=60?1:0;
-    const delay=score>=80?86400000:score>=60?43200000:0;
-    reviews[id]={box,lastScore:score,next:now+delay};
-  }
-  return reviews;
 }
 
 export default function AuthGate({ children }) {
@@ -66,6 +36,9 @@ export default function AuthGate({ children }) {
   const [profileError,setProfileError]=useState('');
   const [profileBusy,setProfileBusy]=useState(false);
   const [dashboardOpen,setDashboardOpen]=useState(false);
+  const [cloudErrorMessage,setCloudErrorMessage]=useState('');
+  const hydrationVersion=useRef(0);
+  const activeUser=useRef(null);
 
   function prepareLocalForUser(userId){
     if(typeof window==='undefined'||!userId)return;
@@ -73,47 +46,67 @@ export default function AuthGate({ children }) {
     if(previous&&previous!==userId){
       localStorage.removeItem(STATS_KEY);
       localStorage.removeItem(REVIEW_KEY);
+      for(const version of ['v02','v03','v05','v06'])for(const kind of ['stats','review'])localStorage.removeItem(`lagerlogik-${version}-${kind}`);
     }
     localStorage.setItem(ACTIVE_USER_KEY,userId);
   }
 
   async function hydrateFromCloud(nextSession,{showLoader=true}={}){
     if(!nextSession?.user){if(showLoader)setLoading(false);return}
+    const version=++hydrationVersion.current;
+    const userId=nextSession.user.id;
+    activeUser.current=userId;
     if(showLoader)setLoading(true);
-    prepareLocalForUser(nextSession.user.id);
-    const {data:rows,error:cloudError}=await supabase.from('answer_history').select('question_id,field,topic,score,answered_at').order('answered_at',{ascending:true});
-    if(!cloudError&&rows){
+    try {
+      prepareLocalForUser(userId);
+      const rows=await loadAnswerHistory(supabase,userId);
+      if(version!==hydrationVersion.current||activeUser.current!==userId)return;
+      setCloudErrorMessage('');
       setCloudCount(rows.length);
-      const cloudStats=buildStats(rows),localStats=safeLoad(STATS_KEY,{});
+      const cloudStats=cloudStatsFromRows(rows),localStats=safeLoad(STATS_KEY,{});
       if(answeredCount(cloudStats)>=answeredCount(localStats)) localStorage.setItem(STATS_KEY,JSON.stringify(cloudStats));
-      const cloudReviews=buildReviews(rows),localReviews=safeLoad(REVIEW_KEY,{});
-      if(Object.keys(cloudReviews).length>=Object.keys(localReviews).length) localStorage.setItem(REVIEW_KEY,JSON.stringify(cloudReviews));
+      const cloudReviews=cloudReviewsFromRows(rows),localReviews=safeLoad(REVIEW_KEY,{});
+      const merged={...localReviews};
+      for(const [id,review] of Object.entries(cloudReviews)){
+        if(!merged[id]||(review.lastAnsweredAt||0)>=(merged[id].lastAnsweredAt||0))merged[id]=review;
+      }
+      localStorage.setItem(REVIEW_KEY,JSON.stringify(merged));
+      window.dispatchEvent(new Event('lagerlogik-progress-updated'));
+    } catch(error) {
+      if(version===hydrationVersion.current)setCloudErrorMessage(error.message);
+    } finally {
+      if(version===hydrationVersion.current)setLoading(false);
     }
-    if(showLoader)setLoading(false);
   }
 
   useEffect(()=>{
-    let active=true;
+    let active=true,authEvent=0;
+    const timers=new Set();
     supabase.auth.getSession().then(async({data})=>{
-      if(!active)return;
+      if(!active||authEvent)return;
       const next=data.session??null;
       setSession(next);
       setProfileName(next?.user?.user_metadata?.display_name||'');
       await hydrateFromCloud(next);
-    });
+    }).catch(error=>{if(active){setError(error.message);setLoading(false)}});
     const {data:listener}=supabase.auth.onAuthStateChange((event,nextSession)=>{
       if(!active)return;
+      if(event!=='INITIAL_SESSION')authEvent++;
+      activeUser.current=nextSession?.user?.id||null;
+      if(nextSession?.user)try{prepareLocalForUser(nextSession.user.id)}catch(error){setCloudErrorMessage(error.message)}
       setSession(nextSession??null);
       setProfileName(nextSession?.user?.user_metadata?.display_name||'');
-      if(!nextSession){setLoading(false);return}
+      if(!nextSession){activeUser.current=null;hydrationVersion.current++;setLoading(false);return}
       // TOKEN_REFRESHED und andere stille Auth-Ereignisse dürfen die App nicht kurz
       // ausblenden. Sonst wird die laufende Lern-/Prüfungssession ungemountet und
       // React startet danach wieder auf der Hauptseite.
       if(event==='SIGNED_IN'||event==='USER_UPDATED'){
-        setTimeout(()=>hydrateFromCloud(nextSession,{showLoader:false}),0);
+        const eventVersion=authEvent;
+        const timer=setTimeout(()=>{timers.delete(timer);if(active&&eventVersion===authEvent&&activeUser.current===nextSession.user.id)hydrateFromCloud(nextSession,{showLoader:false})},0);
+        timers.add(timer);
       }
     });
-    return()=>{active=false;listener.subscription.unsubscribe();};
+    return()=>{active=false;for(const timer of timers)clearTimeout(timer);hydrationVersion.current++;listener.subscription.unsubscribe();};
   },[]);
 
   function switchMode(mode){
@@ -122,6 +115,7 @@ export default function AuthGate({ children }) {
 
   async function submit(e){
     e.preventDefault();setBusy(true);setError('');setMessage('');
+    try {
     if(authMode==='register'){
       if(password.length<6){setError('Das Passwort muss mindestens 6 Zeichen lang sein.');setBusy(false);return}
       if(password!==password2){setError('Die beiden Passwörter stimmen nicht überein.');setBusy(false);return}
@@ -137,7 +131,7 @@ export default function AuthGate({ children }) {
       const {data,error:loginError}=await supabase.auth.signInWithPassword({email,password});
       if(loginError)setError(loginError.message==='Invalid login credentials'?'E-Mail oder Passwort ist falsch.':loginError.message);else if(data.session)await hydrateFromCloud(data.session);
     }
-    setBusy(false);
+    } catch(error){setError(error.message||'Anmeldung fehlgeschlagen')} finally {setBusy(false)}
   }
 
   async function saveProfile(e){
@@ -181,7 +175,7 @@ export default function AuthGate({ children }) {
   const shownName=session.user.user_metadata?.display_name||session.user.email?.split('@')[0]||'Profil';
   return <>
     <div style={styles.accountBar}>
-      <span><b>☁️ Synchronisiert</b> · {cloudCount} Antworten</span>
+      <span title={cloudErrorMessage}><b>{cloudErrorMessage?'⚠️ Cloud-Laden fehlgeschlagen':'☁️ Cloud-Lernstand geladen'}</b> · {cloudCount} Antworten</span>
       <button onClick={()=>{setDashboardOpen(true);setProfileOpen(false)}} style={styles.profileButton}>📊 Dashboard</button>
       <button onClick={()=>{setProfileOpen(v=>!v);setDashboardOpen(false);setProfileMessage('');setProfileError('')}} style={styles.profileButton}>👤 {shownName}</button>
       <button onClick={logout} style={styles.logout}>Abmelden</button>
@@ -198,7 +192,7 @@ export default function AuthGate({ children }) {
       </form>
       <p style={styles.note}>Der Name wird in deinem Supabase-Benutzerprofil gespeichert und bei neuen Lernantworten verwendet.</p>
     </div>}
-    {children}
+    <Fragment key={session.user.id}>{children}</Fragment>
   </>;
 }
 

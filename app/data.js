@@ -61,7 +61,8 @@ export function createCalculationQuestions(seed = Date.now()) {
   const inventoryDiff = int(5,35);
   const inventoryActual = inv - inventoryDiff;
   const turnover = annual / avg;
-  const storageDays = 360 / turnover;
+  // Use exactly the rounded value printed in the question.
+  const storageDays = 360 / (Math.round(turnover * 100) / 100);
   const andler = Math.sqrt((200 * usage * orderCost) / (price * rate));
   return [
     calc(`calc-melde-${seed}`,2,'Bestände',2,`Der Tagesverbrauch beträgt ${daily} Stück, die Lieferzeit ${delivery} Tage und der Mindestbestand ${minStock} Stück. Berechne den Meldebestand.`,daily*delivery+minStock,`Meldebestand = ${daily} × ${delivery} + ${minStock} =`),
