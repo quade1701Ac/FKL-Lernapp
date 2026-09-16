@@ -33,9 +33,17 @@ der echten Vorschau-API, jeweils mit `openai/gpt-oss-120b`:
 Reproduzierbar über `scripts/check-receiving-live.mjs <preview-url>`;
 die Live-Prüfung wird bewusst nicht automatisch in CI ausgeführt.
 Die Stichprobe ist keine Garantie identischer KI-Urteile bei jedem Aufruf.
-Der Browserzugriff funktioniert wieder; die Vorschau zeigt die Loginseite.
-Echter Login/Cloud-Abgleich bleibt bis zur sicheren Anmeldung offen.
-Produktionsstand und bestehende Lernbewertungen wurden nicht verändert.
+Der Browserzugriff funktioniert wieder. Nach sicherer Anmeldung wurden im
+echten Browser Cloud-Hydration und Dashboard geprüft. Eine korrekte MC-Testantwort
+wurde gespeichert; nach vollständigem Neuladen zeigten Cloud-Status und Dashboard
+übereinstimmend einen zusätzlichen Versuch. Session-Wiederherstellung und Abmeldung
+waren erfolgreich. Der einzelne Testversuch bleibt im angemeldeten Konto.
+Es wurden keine personenbezogenen Fortschrittswerte in diesem Bericht veröffentlicht.
+Produktionscode und historische Lernbewertungen wurden nicht verändert.
+Dieser Durchlauf ersetzt keine vollständige mobile Sichtprüfung aller Ansichten;
+Registrierung wurde dabei nicht durch die Anlage eines weiteren Kontos getestet.
+Die weiter unten genannten ursprünglichen Browser-/Login-Blocker sind damit für
+diesen beschriebenen Durchlauf erledigt.
 
 Status: geprüfter Entwicklungsstand, noch nicht für die Produktion freigegeben.
 
