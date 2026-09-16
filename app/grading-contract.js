@@ -1,3 +1,11 @@
+export const GRADING_SCOPE_RULES = `Bewertungsumfang bei Abläufen:
+- Bestimme zuerst den ausdrücklich gefragten Prozessabschnitt. Spätere Arbeitsschritte sind keine Pflicht, wenn nur die unmittelbare Maßnahme gefragt ist.
+- Bereits im Sachverhalt als erledigt oder bestätigt genannte Kontrollen müssen nicht wiederholt werden. Aus bloßen Mengenangaben folgt jedoch nicht automatisch, dass auch die Identität geprüft wurde.
+- Eine fachlich gleichwertige Absicherung zählt: Sperrlager oder Quarantäne bedeutet vorerst keine Freigabe. Daraus folgt nicht, dass die spätere Feinkontrolle schon durchgeführt wurde.
+- Bei ausdrücklich später vorgesehener Feinkontrolle verlange keine sofortige Inhaltsprüfung. Verlange umgekehrt die Feinkontrolle, wenn die Frage gerade nach ihr oder dem vollständigen Ablauf fragt.
+- Ergänzende Lernhinweise sind keine Abzugsgründe. Jeder Abzug muss eine im gefragten Abschnitt notwendige, tatsächlich fehlende oder falsche Handlung benennen.
+- Wesentliche Auslassungen und gefährliche oder widersprüchliche Handlungen bleiben Fehler. Passende Schlagwörter allein reichen nicht für FULL.`;
+
 export function normalizedAnswer(value = '') {
   return String(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss').replace(/[^a-z0-9]+/g, ' ').trim();
 }

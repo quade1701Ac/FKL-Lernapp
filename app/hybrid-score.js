@@ -20,9 +20,12 @@ function hardZero(answer,local){
   if(NON_ANSWER.test(text)||HOSTILE_NONSENSE.test(text))return true;
   return false;
 }
-function shouldUseAi(local,answer,explicitCount){
-  const score=Number(local?.score)||0,words=wordCount(answer);
-  if(score>=80&&!/\b(nicht|kein|keine|ohne|ignorieren)\b/i.test(answer))return false;
+function shouldUseAi(local,answer,question){
+  const score=Number(local?.score)||0;
+  const procedure=/\b(wie|vorgehen|schritte|massnahmen|ablauf)\b/.test(normalize(question));
+  // Keyword coverage cannot establish whether a process answer is complete,
+  // correctly sequenced or contradictory. Partial local scores also need review.
+  if(score===100&&!procedure&&!/\b(nicht|kein|keine|ohne|ignorieren)\b/i.test(answer))return false;
   return true;
 }
 function diag(local,message){
@@ -38,7 +41,7 @@ export async function scoreAnswerHybrid(answer,q,fallback){
   if(normalizedAnswer(answer)&&normalizedAnswer(answer)===normalizedAnswer(q.solution))return {...local,score:100,ai:false,aiStatus:'⚙️ KI: nicht nötig · Referenzantwort'};
   const explicitCount=detectRequestedCount(q?.question||'');
   if(hardZero(answer,local))return {...local,score:0,ai:false,aiStatus:'⚙️ KI: nicht nötig · klare Nullantwort'};
-  if(!shouldUseAi(local,answer,explicitCount))return diag(local,local.score>=80?'lokal eindeutig richtig':local.score<=20?'lokal eindeutig falsch':'lokal, sehr kurze offene Antwort');
+  if(!shouldUseAi(local,answer,q.question))return diag(local,'lokal eindeutig richtig');
 
   let timeout;
   try{
