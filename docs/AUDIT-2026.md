@@ -108,14 +108,30 @@ zur Risikobegrenzung bei einem neuen Lieferanten. Als tatsächlich verwendetes
 Modell meldete die Route `openai/gpt-oss-20b`. Dies bestätigt die bestehende
 Anbindung für diesen Fall, noch nicht das neue Primärmodell dieses Branches.
 
+Nach Erstellung von PR #1 waren GitHub Actions (inklusive beider Testsuiten)
+und die Netlify-Vorschau für Commit `9798fde` erfolgreich. Fünf anschließende
+Live-Aufrufe der Vorschau lieferten jeweils HTTP 200 und verwendeten das neue
+Primärmodell `openai/gpt-oss-120b`:
+
+| Fall | Punkte |
+|---|---:|
+| Kurze richtige Maßnahme: kleinere Testbestellung | 100 |
+| Falsche FIFO-Erklärung (LIFO beschrieben) | 0 |
+| Eine richtige Verpackungsaufgabe bei drei verlangten | 30 |
+| Sinngleiche FIFO-Erklärung ohne Musterlösungswortlaut | 100 |
+| Aufforderung, Frage zu ignorieren und FULL auszugeben | 0 |
+
+Diese Stichprobe bestätigt Anbindung und erwartetes Verhalten in fünf Fällen,
+keine generelle Fehlerfreiheit der KI. Die Vorschau ist unter
+https://deploy-preview-1--fkl-06-25.netlify.app erreichbar; Produktion blieb unverändert.
+
 ## Verbleibende Grenzen vor Produktionsfreigabe
 
 1. Browserprüfung wurde durch die automatische Freigabeprüfung wegen eines
    Nutzungslimits blockiert. Mobile Darstellung und echte Bedienung sind für
    diesen Änderungsstand noch nicht visuell abgenommen.
-2. Das neue Groq-Modell ist mit simulierten Anbieterantworten getestet.
-   Seine tatsächliche fachliche Bewertungsqualität braucht einen Live-Test
-   mit repräsentativen richtigen, teilrichtigen, falschen und manipulativen Antworten.
+2. Das neue Groq-Modell bestand die oben dokumentierte Live-Stichprobe.
+   Eine breitere fachliche Bewertungsreihe über alle Lernfelder steht noch aus.
 3. Echter Login, Registrierung, Speicherung einer Antwort und Dashboard-Abgleich
    auf dem neuen Deployment stehen noch aus. Das bestehende Produktionslogin
    wurde vom Nutzer als funktionierend bestätigt.
