@@ -3,7 +3,7 @@
 import { qualityCheckedQuestions } from './question-quality-filter';
 import { finalAuditQuestions } from './question-audit';
 
-function shuffle(a){return [...a].sort(()=>Math.random()-.5)}
+function shuffle(source){const a=[...source];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function shuffleMc(q){
  if(q?.type!=='mc'||!Array.isArray(q.options)||q.options.length<2)return q;
  const correct=new Set((q.correct||[]).map(Number));
@@ -37,7 +37,7 @@ export function examPick(qs,limit=30){
  const maxPerField=target>=24?Math.ceil(target/12):Math.ceil(target/Math.min(12,target));
  function add(q){if(!q||ids.has(String(q.id)))return false;chosen.push(q);ids.add(String(q.id));typeCount[q.type]=(typeCount[q.type]||0)+1;fieldCount[q.field]=(fieldCount[q.field]||0)+1;return true}
  function scoreCandidate(q){const typeNeed=Math.max(0,(typeTargets[q.type]||0)-(typeCount[q.type]||0));const fieldNeed=Math.max(0,2-(fieldCount[q.field]||0));const diff=Number(q.difficulty)||1;return fieldNeed*12+typeNeed*2+Math.min(4,diff)*.2+Math.random()*.1}
- function bestFrom(pool){return pool.reduce((best,q)=>!best||scoreCandidate(q)>scoreCandidate(best)?q:best,null)}
+ function bestFrom(pool){let best=null,bestScore=-Infinity;for(const q of pool){const score=scoreCandidate(q);if(score>bestScore){best=q;bestScore=score}}return best}
  // Runde 1 + 2: jedes Lernfeld bekommt nach Möglichkeit zwei Aufgaben. Dabei wird
  // bereits auf die noch fehlenden Aufgabentypen geachtet.
  for(let round=0;round<2;round++)for(let field=1;field<=12&&chosen.length<target;field++){
@@ -50,7 +50,7 @@ export function examPick(qs,limit=30){
 }
 
 // Kleine Diagnosehilfe für Tests/Entwicklung. Verändert keine Fragen.
-export function examComposition(list=[]){const fields={},types={};for(const q of list){fields[q.field]=(fields[q.field]||0)+1;types[q.type]=(types[q.type]||0)+1}return{size:list.length,fields,types,minField:Math.min(...Object.values(fields),0),maxField:Math.max(...Object.values(fields),0)}}
+export function examComposition(list=[]){const fields={},types={};for(const q of list){fields[q.field]=(fields[q.field]||0)+1;types[q.type]=(types[q.type]||0)+1}return{size:list.length,fields,types,minField:list.length?Math.min(...Object.values(fields)):0,maxField:Math.max(...Object.values(fields),0)}}
 
 export function randomPick(qs,limit){
  if(limit>=30)return examPick(qs,limit);

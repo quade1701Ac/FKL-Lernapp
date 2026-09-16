@@ -19,6 +19,7 @@ import { lf1V101Questions } from './questions-lf1-v101';
 import { curriculumGapQuestions } from './questions-curriculum-gaps-v102';
 import { curriculumAdvancedQuestions } from './questions-curriculum-advanced-v103';
 import { curriculumCompleteV110Questions } from './questions-curriculum-complete-v110';
+import { auditQuestions } from './questions-audit-2026';
 
 const NEAR_DUPLICATE_IDS = new Set([
   'qb14-7-01','qb14-7-04','qb14-8-01','qb14-8-02','qb14-8-04','qb14-9-02','qb14-9-07',
@@ -32,6 +33,7 @@ const MISPLACED_IDS = new Set([
 ]);
 
 const allQuestions = [
+  ...auditQuestions,
   ...v08Questions,...v09Questions,...qualityQuestions,...v11Questions,
   ...replacementLf5to12Questions,...expansionV12Questions,...qualityReplacementQuestions,
   ...qualityLf9to12Questions,...v10Batch1Questions,...v10CalculationQuestions,
