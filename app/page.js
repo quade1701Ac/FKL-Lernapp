@@ -10,6 +10,7 @@ import { wisoQuestions } from './questions-wiso-v110';
 import { calculationInfo } from './v07-utils';
 import { scoreAnswerHybrid } from './hybrid-score';
 import { smartPick, randomPick } from './smart-selection';
+import { buildWrittenExam } from './exam-selection';
 import { supabase } from './supabase-client';
 import { nextReview } from './history';
 import ForkliftRush from './ForkliftRush';
@@ -52,12 +53,8 @@ export default function Home(){
  function changeTopic(t){setSelectedTopic(t);const pool=allQuestions.filter(q=>q.field===selectedField&&(t==='Alle Themen'||q.topic===t));setSessionQuestions(selectQuestions(pool,mode,SESSION_SIZE));setIndex(0);setSessionResults([]);clearAnswer()}
  function changeMode(m){if(m==='weak'){startWeakness();return}if(m==='mistakes'){startMistakes();return}setMode(m);const pool=allQuestions.filter(q=>q.field===selectedField&&(selectedTopic==='Alle Themen'||q.topic===selectedTopic));setSessionQuestions(selectQuestions(pool,m,SESSION_SIZE));setSessionResults([]);setIndex(0);clearAnswer()}
  function startExam(){
-  const processFields=new Set([1,2,5,6,9,11,12]);
-  const handlingFields=new Set([3,4,7,8,10]);
-  const process=randomPick(allQuestions.filter(q=>processFields.has(Number(q.field))),15).map(q=>({...q,_examArea:'Prozesse der Lagerlogistik'}));
-  const handling=randomPick(allQuestions.filter(q=>handlingFields.has(Number(q.field))),9).map(q=>({...q,_examArea:'Rationeller & qualitätssichernder Güterumschlag'}));
-  const wiso=randomPick(wisoQuestions,6).map(q=>({...q,_examArea:'Wirtschafts- & Sozialkunde'}));
-  setSessionQuestions([...process,...handling,...wiso]);setSessionResults([]);setMode('exam');setIndex(0);clearAnswer();setView('session');
+  let questions;try{questions=buildWrittenExam([...allQuestions,...wisoQuestions])}catch(error){alert(error.message);return}
+  setSessionQuestions(questions);setSessionResults([]);setMode('exam');setIndex(0);clearAnswer();setView('session');
  }
  function startWiso(){resetSession(wisoQuestions,'wiso',SESSION_SIZE)}
  function startWeakness(){resetSession(allQuestions,'weak',SESSION_SIZE)}function startMistakes(){if(!mistakeQuestions.length){alert('Aktuell sind keine falsch beantworteten Fragen gespeichert. 🎉');return}resetSession(mistakeQuestions,'mistakes',Math.min(SESSION_SIZE,mistakeQuestions.length))}

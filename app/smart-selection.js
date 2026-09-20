@@ -10,8 +10,8 @@ function shuffleMc(q){
  const mixed=shuffle(q.options.map((text,index)=>({text,wasCorrect:correct.has(index)})));
  return {...q,options:mixed.map(x=>x.text),correct:mixed.map((x,index)=>x.wasCorrect?index:null).filter(x=>x!==null)};
 }
-function preparePicked(list){return list.map(shuffleMc)}
-function checkedPool(qs){return finalAuditQuestions(qualityCheckedQuestions(qs))}
+export function preparePicked(list){return list.map(shuffleMc)}
+export function checkedPool(qs){return finalAuditQuestions(qualityCheckedQuestions(qs))}
 function average(s){return s?.answered?Math.round((s.points||0)/s.answered):null}
 function weightFor(q,reviews,stats){
  const review=reviews?.[q.id],field=stats?.[q.field],topic=field?.topics?.[q.topic];let w=1;
