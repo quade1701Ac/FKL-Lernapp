@@ -16,32 +16,34 @@ export function actionsFor(job){
  if(!job)return[];
  if(job.kind==='damage'){
   if(job.stage==='arrival')return[
-   {label:'Schaden dokumentieren & prüfen',next:{area:'check',stage:'inspection',text:'Schaden dokumentiert · Ware wird geprüft'},msg:'Schaden dokumentiert und Ware zur Prüfung gegeben.'},
-   {label:'Direkt ins Sperrlager',complete:true,msg:'Beschädigte Ware gesichert und Vorgang dokumentiert.',score:2},
+   {label:'Schaden dokumentieren & prüfen',next:{area:'check',stage:'inspection',text:'Prüfbefund: zwei beschädigte Kartons getrennt; Restware ohne Befund'},msg:'Schaden dokumentiert und Ware zur Prüfung gegeben.'},
+   {label:'Direkt ins Sperrlager',next:{area:'check',stage:'secured',text:'Ware gesperrt · Schadendokumentation und Prüfung stehen aus'},msg:'Beschädigte Ware gesichert. Dokumentation und Prüfung sind noch offen.'},
    {label:'Trotz Schaden einlagern',next:{area:'store',stage:'stored-bad',text:'Beschädigte Ware ungeprüft eingelagert'},msg:'Beschädigte Ware ungeprüft eingelagert.',bad:true,quality:-18,time:4}
   ];
+  if(job.stage==='secured')return[{label:'Schaden dokumentieren & prüfen',next:{area:'check',stage:'inspection',text:'Prüfbefund: zwei beschädigte Kartons getrennt; Restware ohne Befund'},msg:'Schaden dokumentiert; zwei Kartons gesperrt, Restware geprüft.'}];
   if(job.stage==='inspection')return[
    {label:'Restware freigeben & einlagern',complete:true,msg:'Schaden erfasst, verwendbare Ware freigegeben und sauber eingebucht.',quality:3},
-   {label:'Gesamte Lieferung sperren',complete:true,msg:'Lieferung nach Prüfung vollständig gesperrt.',quality:2}
+   {label:'Gesamte Lieferung sperren',msg:'Auch die geprüfte Restware bleibt gesperrt. Eine Freigabe muss noch geklärt werden.',next:{area:'check',stage:'held',text:'Zwei Kartons beschädigt; Restware geprüft, Freigabe noch offen'}}
   ];
+  if(job.stage==='held')return[{label:'Geprüfte Restware freigeben, beschädigte Kartons gesperrt übergeben',complete:true,msg:'Restware freigegeben und gesperrte Kartons mit Klärauftrag übergeben.'}];
   if(job.stage==='stored-bad')return[{label:'Fehler korrigieren & Ware sperren',complete:true,msg:'Falsche Einlagerung korrigiert. Ware nachträglich gesperrt.',quality:4,time:4}];
  }
  if(job.kind==='danger'){
   if(job.stage==='arrival')return[
-   {label:'Dokumente & Kennzeichnung prüfen',next:{area:'check',stage:'inspection',text:'Gefahrgut-Dokumente werden geprüft'},msg:'Gefahrgut-Unterlagen und Kennzeichnung werden geprüft.',safety:2},
+   {label:'Dokumente & Kennzeichnung prüfen',next:{area:'check',stage:'inspection',text:'Prüfbefund: UN-Nummer in Dokument und Kennzeichnung stimmt nicht überein'},msg:'Gefahrgut-Unterlagen und Kennzeichnung werden geprüft.',safety:2},
    {label:'Ohne Prüfung einlagern',next:{area:'store',stage:'stored-bad',text:'Gefahrgut ungeprüft im Lager'},msg:'Gefahrgut ohne Prüfung eingelagert.',bad:true,safety:-22,time:4},
    {label:'Lieferung sofort zurückweisen',complete:true,msg:'Lieferung ohne sachlichen Grund zurückgewiesen.',bad:true,score:-8,time:4}
   ];
   if(job.stage==='inspection')return[
-   {label:'Prüfung okay → vorschriftsmäßig einlagern',complete:true,msg:'Gefahrgut geprüft und vorschriftsmäßig eingelagert.',safety:3},
+   {label:'Trotz Abweichung einlagern',next:{area:'store',stage:'stored-bad',text:'Ungeklärte Abweichung bei Gefahrgut'},msg:'Die bekannte Abweichung wurde vor Einlagerung nicht geklärt.',bad:true,safety:-22},
    {label:'Abweichung feststellen → Annahme klären',complete:true,msg:'Abweichung erkannt und Lieferung bis zur Klärung gesichert.',safety:4,quality:2}
   ];
-  if(job.stage==='stored-bad')return[{label:'Einlagerung stoppen & Prüfung nachholen',next:{area:'check',stage:'inspection',text:'Nachträgliche Gefahrgutprüfung läuft'},msg:'Unsichere Einlagerung gestoppt. Prüfung wird nachgeholt.',safety:5,time:4}];
+  if(job.stage==='stored-bad')return[{label:'Einlagerung stoppen & Prüfung nachholen',next:{area:'check',stage:'inspection',text:'Prüfbefund: UN-Nummer in Dokument und Kennzeichnung stimmt nicht überein'},msg:'Unsichere Einlagerung gestoppt. Prüfung wird nachgeholt.',safety:5,time:4}];
  }
  if(job.kind==='express'){
   if(job.stage==='picking')return[
    {label:'Priorisieren & Kommissionierung abschließen',next:{area:'pack',stage:'packing',text:'18 Positionen kommissioniert · Express'},msg:'Expressauftrag priorisiert und zur Verpackung gegeben.',score:3},
-   {label:'Normal weiterbearbeiten',next:{area:'pack',stage:'packing',text:'18 Positionen kommissioniert'},msg:'Expressauftrag ohne Sonderpriorität zur Verpackung gegeben.'},
+   {label:'Normal weiterbearbeiten',time:3,next:{area:'pack',stage:'packing',text:'18 Positionen kommissioniert'},msg:'Expressauftrag ohne Sonderpriorität zur Verpackung gegeben.'},
    {label:'Zurückstellen',next:{area:'pick',stage:'picking-wait',text:'Expressauftrag wartet weiter'},msg:'Expressauftrag zurückgestellt.',bad:true,score:-8,time:4}
   ];
   if(job.stage==='picking-wait')return[
