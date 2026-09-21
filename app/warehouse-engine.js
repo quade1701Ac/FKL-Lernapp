@@ -64,7 +64,7 @@ export function actionsFor(job){
    {label:'Zurückstellen',next:{area:'pack',stage:'packing-wait',text:'Fertiger Auftrag wartet'},msg:'Fertiger Auftrag unnötig zurückgestellt.',bad:true,score:-5,time:4}
   ];
   if(job.stage==='packing-wait')return[{label:'Jetzt verpacken',next:{area:'out',stage:'ready',text:'12 Positionen · versandbereit'},msg:'Auftrag nach Wartezeit verpackt und bereitgestellt.'}];
-  if(job.stage==='ready')return[{label:'Verladen & Versand abschließen',complete:true,delivered:1,msg:'Auftrag 377 verladen und abgeschlossen.',score:4}];
+  if(job.stage==='ready')return[{label:'Verladen & Versand abschließen',complete:true,delivered:1,msg:'Auftrag verladen und abgeschlossen.',score:4}];
  }
  if(job.kind==='stock'){
   if(job.stage==='difference')return[

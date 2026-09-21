@@ -1,35 +1,22 @@
 'use client';
-import {useMemo,useState} from 'react';
-
-import { AREAS, clamp, cloneInitial, actionsFor, advanceJobs, shiftPerformance } from './warehouse-engine';
+import {useState} from 'react';
+import {AREAS,actionsFor} from './warehouse-engine';
+import {SHIFTS,clock,createShift,assignTask,tickShift,shiftResult} from './warehouse-shifts';
 
 export default function WarehouseTycoon({onClose}){
- const [minute,setMinute]=useState(0),[jobs,setJobs]=useState(cloneInitial),[selected,setSelected]=useState(null),[score,setScore]=useState(100),[quality,setQuality]=useState(100),[safety,setSafety]=useState(100),[delivered,setDelivered]=useState(0),[log,setLog]=useState([]),[done,setDone]=useState(false);
- const job=jobs.find(j=>j.id===selected);const clock=`${String(8+Math.floor(minute/60)).padStart(2,'0')}:${String(minute%60).padStart(2,'0')}`;
- const open=jobs.length;const performance=useMemo(()=>shiftPerformance(score,quality,safety,jobs.length),[score,quality,safety,jobs.length]);
- const actions=actionsFor(job);
- function addLogs(entries){setLog(l=>[...entries,...l])}
- function act(action){
-  if(done||!job||!action)return;
-  const transition=advanceJobs(jobs,job.id,action.label);
-  if(!transition)return;
-  const {time,late,nextJobs}=transition;
-  setJobs(nextJobs);setMinute(m=>m+time);setSelected(null);
-  if(action.score)setScore(s=>clamp(s+action.score));
-  if(action.quality)setQuality(q=>clamp(q+action.quality));
-  if(action.safety)setSafety(s=>clamp(s+action.safety));
-  if(action.delivered)setDelivered(d=>d+action.delivered);
-  if(late)setScore(s=>clamp(s-late*8));
-  const entries=[{time:clock,text:action.msg,bad:!!action.bad}];
-  if(late)entries.unshift({time:clock,text:`${late} Vorgang${late>1?'e':''} hat die Frist überschritten.`,bad:true});
-  addLogs(entries);
-  if(minute+time>=40||nextJobs.length===0)setDone(true);
- }
- function restart(){setMinute(0);setJobs(cloneInitial());setSelected(null);setScore(100);setQuality(100);setSafety(100);setDelivered(0);setLog([]);setDone(false)}
- return <section className="pressure"><header className="pressureHead"><div><span>PRAXIS-SIMULATION</span><h1>🔥 Lager unter Druck</h1><p>Vorgänge durchlaufen echte Prozessschritte. Jede Aktion verändert ihren Zustand.</p></div><button onClick={onClose}>← Praxiswelt</button></header>
- <div className="pressureHud"><div><small>UHRZEIT</small><b>{clock}</b></div><div><small>OFFEN</small><b>{open}</b></div><div><small>TERMINE</small><b>{score}%</b></div><div><small>QUALITÄT</small><b>{quality}%</b></div><div><small>SICHERHEIT</small><b>{safety}%</b></div></div>
- {!done?<><div className="warehouseMap">{AREAS.map(a=><section key={a.id} className="warehouseArea"><header><span>{a.icon}</span><b>{a.name}</b><small>{jobs.filter(j=>j.area===a.id).length}</small></header><div>{jobs.filter(j=>j.area===a.id).map(j=><button key={j.id} className={`${selected===j.id?'active ':''}${j.due<=5?'urgent':''}`} onClick={()=>setSelected(j.id)}><span>{j.icon}</span><div><b>{j.title}</b><small>{j.text}</small></div><em>{j.due>=0?`${j.due} min`:'ÜBERFÄLLIG'}</em></button>)}</div></section>)}</div>
- {job?<aside className="jobPanel"><div><small>AKTIVER VORGANG</small><h2>{job.icon} {job.title}</h2><p>{job.text}</p></div><div className="jobActions">{actions.map(a=><button key={a.label} onClick={()=>act(a)}>{a.label} · {a.time||2} min</button>)}</div><small className="processHint">Nur Aktionen, die zum aktuellen Prozessschritt passen, sind verfügbar.</small></aside>:<div className="pressureHint">👆 Wähle einen Vorgang im Lager aus. Fristen laufen mit jeder Aktion weiter.</div>}
- <div className="pressureLog"><b>Schichtprotokoll</b>{log.length?log.map((l,i)=><p key={i} className={l.bad?'bad':''}><span>{l.time}</span>{l.text}</p>):<p>Noch keine Aktionen.</p>}</div><button className="finishShift" onClick={()=>setDone(true)}>Schicht vorzeitig auswerten</button></>:<article className="pressureEnd"><span>SCHICHT BEENDET</span><h2>{performance}% Schichtleistung</h2><div><p><b>{delivered}</b><small>Aufträge abgeschlossen</small></p><p><b>{jobs.length}</b><small>Vorgänge offen</small></p><p><b>{quality}%</b><small>Qualität</small></p><p><b>{safety}%</b><small>Sicherheit</small></p></div><p>{performance>=90?'Sehr sauber. Du hast die Vorgänge konsequent durch die Prozesskette gesteuert. 🏆':performance>=70?'Solide Schicht. Im Protokoll siehst du, wo Zeit oder Qualität verloren gingen.':'Das Lager hat ordentlich zurückgeschlagen. Genau dafür ist die Simulation da. 🔥'}</p><section className="pressureLog"><b>Deine Entscheidungen</b>{log.map((l,i)=><p key={i} className={l.bad?'bad':''}><span>{l.time}</span>{l.text}</p>)}</section><button onClick={restart}>↻ Schicht erneut üben</button></article>}
+ const [state,setState]=useState(()=>createShift()),[selected,setSelected]=useState(null),[workerId,setWorkerId]=useState(1),[started,setStarted]=useState(false);
+ const result=shiftResult(state),scenario=SHIFTS.find(s=>s.id===state.scenario),job=state.jobs.find(j=>j.id===selected);
+ const busy=job&&state.workers.some(w=>w.task?.jobId===job.id),worker=state.workers.find(w=>w.id===workerId);
+ function restart(id=state.scenario){setState(createShift(id));setSelected(null);setWorkerId(1);setStarted(false)}
+ function assign(label){setState(s=>assignTask(s,workerId,selected,label));setSelected(null)}
+ return <section className="pressure"><header className="pressureHead"><div><span>PRAXIS-SIMULATION</span><h1>🔥 Lager unter Druck</h1><p>Zwei Mitarbeitende, parallele Abläufe und angekündigte Aufträge.</p></div><button onClick={onClose}>← Praxiswelt</button></header>
+ {!started?<article className="pressureEnd"><h2>Welche Schicht übernimmst du?</h2><div className="shiftOptions">{SHIFTS.map(s=><button key={s.id} onClick={()=>restart(s.id)} aria-pressed={s.id===state.scenario}><b>{s.name}</b><small>{s.description}</small></button>)}</div><p>40 simulierte Minuten. Beide Mitarbeitenden können alle angebotenen Aufgaben übernehmen. Weise ihnen unterschiedliche Vorgänge zu und klicke dann auf „1 Minute weiter“. Beim Planen steht die Uhr still.</p><p>Endwertung: Termine 45 %, Qualität 30 %, Sicherheit 25 %, gewichtet mit dem Anteil abgeschlossener Vorgänge. Nicht abgeschlossene und noch angekündigte Vorgänge zählen als offen.</p><button onClick={()=>setStarted(true)}>Schicht starten</button></article>:<>
+ <p><b>{scenario.name}</b> · {state.total} Vorgänge insgesamt</p><div className="pressureHud"><div><small>UHRZEIT</small><b>{clock(state.minute)}</b></div><div><small>OFFEN / ANGEKÜNDIGT</small><b>{state.jobs.length} / {state.pending.length}</b></div><div><small>TERMINE</small><b>{result.punctuality}%</b></div><div><small>QUALITÄT</small><b>{state.quality}%</b></div><div><small>SICHERHEIT</small><b>{state.safety}%</b></div></div>
+ {!state.done?<><section className="staffPanel"><h2>Personal einteilen</h2><div className="staffGrid">{state.workers.map(w=><button key={w.id} aria-pressed={workerId===w.id} onClick={()=>setWorkerId(w.id)}><b>{w.name}</b><small>{w.task?`${state.jobs.find(j=>j.id===w.task.jobId)?.title} · ${w.task.action.label} · noch ${w.task.finish-state.minute} min`:'Frei – Aufgabe zuweisen'}</small></button>)}</div><button className="advanceTime" onClick={()=>setState(tickShift)}>1 Minute weiter</button><small>Aufgaben starten gleichzeitig, wenn du sie vor dem nächsten Zeitschritt zuweist.</small></section>
+ <aside className="pressureLog"><b>Angekündigte Ankünfte</b>{state.pending.length?state.pending.map(j=><p key={j.id}>{clock(j.arrival)} · {j.title} · Frist {clock(j.deadline)}</p>):<p>Alle Vorgänge sind eingetroffen.</p>}</aside>
+ <div className="warehouseMap">{AREAS.map(a=><section key={a.id} className="warehouseArea"><header><span>{a.icon}</span><b>{a.name}</b><small>{state.jobs.filter(j=>j.area===a.id).length}</small></header><div>{state.jobs.filter(j=>j.area===a.id).map(j=>{const assigned=state.workers.find(w=>w.task?.jobId===j.id);return <button key={j.id} className={`${selected===j.id?'active ':''}${j.deadline-state.minute<=5?'urgent':''}`} onClick={()=>setSelected(j.id)}><span>{j.icon}</span><div><b>{j.title}</b><small>{j.text}</small><small>{assigned?`${assigned.name} arbeitet`:'Wartet auf Zuweisung'}</small></div><em>{j.deadline>=state.minute?`${j.deadline-state.minute} min`:'ÜBERFÄLLIG'}</em></button>})}</div></section>)}</div>
+ {job?<aside className="jobPanel"><h2>{job.title}</h2><p>{job.text}</p><p>{busy?'Dieser Vorgang wird bereits bearbeitet.':worker.task?`${worker.name} ist beschäftigt. Wähle eine freie Person.`:`Aufgabe für ${worker.name}:`}</p><div className="jobActions">{actionsFor(job).map(a=><button key={a.label} disabled={busy||!!worker.task} onClick={()=>assign(a.label)}>{a.label} · {a.time||2} min</button>)}</div></aside>:<p className="pressureHint">Wähle eine freie Person und anschließend einen Vorgang.</p>}
+ <button className="finishShift" onClick={()=>setState(s=>({...s,done:true}))}>Schicht vorzeitig auswerten</button></>:<article className="pressureEnd"><span>SCHICHT BEENDET</span><h2>{result.performance}% Schichtleistung</h2><p>{state.completed}/{state.total} Vorgänge abgeschlossen · {state.delivered} Sendungen versandt · {result.open} offen · {state.late} Fristen überschritten.</p><p>Qualitäts- und Sicherheitsfehler bleiben in der Wertung sichtbar. In der Zeitleiste stehen Bearbeitungsdauer, Prüfergebnisse und die Situation beim Fristablauf.</p>{state.workers.filter(w=>w.task).map(w=><p key={w.id}>{w.name}: „{w.task.action.label}“ bei Schichtende noch nicht abgeschlossen.</p>)}<button onClick={()=>restart()}>Schichtauswahl / erneut üben</button></article>}
+ <section className="pressureLog"><b>{state.done?'Deine Entscheidungen und Folgen':'Schichtprotokoll'}</b>{state.log.length?state.log.map((entry,i)=><p key={i} className={['late','error'].includes(entry.kind)?'bad':''}><span>{clock(entry.minute)}</span>{entry.text}</p>):<p>Noch keine Aktionen.</p>}</section></>}
  </section>
 }
