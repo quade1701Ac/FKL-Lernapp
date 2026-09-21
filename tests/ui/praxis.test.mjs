@@ -20,9 +20,16 @@ test('careful shift ends at 100 percent with reasons',async()=>{
  for(let i=0;i<8;i++){const title=text(ui.root.findByType('h1'));const e=EVENTS.find(e=>e.title===title);await click(ui,e.choices[0][0]);}
  assert.match(text(ui.root),/100% Entscheidungsqualität/);assert.equal(ui.root.findAll(n=>n.props.className==='shiftLog')[0].children.length,8);await act(async()=>ui.unmount());
 });
-test('warehouse retains complete history and shows action duration',async()=>{
+test('warehouse starts chosen shift, assigns two workers, progresses together and restarts',async()=>{
  let ui;await act(async()=>{ui=create(React.createElement(Warehouse))});
- const steps=[['Express 381','Priorisieren'],['Express 381','Express verpacken'],['Express 381','Verladen'],['Auftrag 377','Verpacken'],['Auftrag 377','Verladen'],['Lieferung 4711','Schaden dokumentieren'],['Lieferung 4711','Restware freigeben'],['A-Artikel X14','Bestand gezielt'],['A-Artikel X14','Differenz klären'],['Gefahrgut-Lieferung','Dokumente &'],['Gefahrgut-Lieferung','Abweichung feststellen']];
- for(const [job,action] of steps){await click(ui,job);assert.match(text(ui.root.find(n=>n.props.className==='jobActions')),/2 min/);await click(ui,action);}
- assert.match(text(ui.root),/SCHICHT BEENDET/);assert.ok(ui.root.find(n=>n.props.className==='pressureLog').findAllByType('p').length>10);assert.match(text(ui.root),/Expressauftrag priorisiert/);await act(async()=>ui.unmount());
+ await click(ui,'Express-Spitze');await click(ui,'Schicht starten');
+ await click(ui,'Express 381');await click(ui,'Priorisieren');
+ await click(ui,'Sam');await click(ui,'Auftrag 377');await click(ui,'Verpacken');
+ assert.match(text(ui.root),/noch 2 min/);
+ await click(ui,'1 Minute weiter');assert.match(text(ui.root),/noch 1 min/);
+ await click(ui,'1 Minute weiter');assert.match(text(ui.root),/Expressauftrag priorisiert/);
+ assert.match(text(ui.root),/Auftrag verpackt/);
+ await click(ui,'Schicht vorzeitig auswerten');assert.match(text(ui.root),/SCHICHT BEENDET/);
+ await click(ui,'Schichtauswahl / erneut üben');assert.match(text(ui.root),/Welche Schicht/);
+ await act(async()=>ui.unmount());
 });
