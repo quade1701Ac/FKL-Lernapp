@@ -1,5 +1,5 @@
 import './globals.css';
-import './forklift-rush.css';
+
 import './order-question.css';
 import './shift-simulator.css';
 import './warehouse-tycoon.css';
