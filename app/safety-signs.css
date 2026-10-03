@@ -10,7 +10,7 @@
 .signRuleMark{grid-row:span 2;display:grid;place-items:center;font-size:30px;line-height:1}
 .signRuleMark.mandatory{color:#4d9add}.signRuleMark.prohibited{color:#ff7479}
 .signsControls{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin-bottom:20px}
-.signsTabs{display:flex;gap:6px;min-width:0;padding:4px;background:#111e31;border:1px solid #2a4160;border-radius:14px}
+.signsTabs{display:flex;flex-wrap:wrap;gap:6px;min-width:0;padding:4px;background:#111e31;border:1px solid #2a4160;border-radius:14px}
 .signsTabs button{border:0;background:transparent;border-radius:10px;padding:10px 13px;color:#b9c9e0;font-size:13px;font-weight:700;line-height:1.2;cursor:pointer;white-space:nowrap}
 .signsTabs button.active{background:#284b79;color:#fff;box-shadow:0 3px 12px #0004}
 .signsTabs button:focus-visible,.signCard:focus-visible,.signQuizOptions button:focus-visible{outline:2px solid #92c4ff;outline-offset:2px}
@@ -63,3 +63,7 @@
  .signQuiz{padding:18px 14px}.signQuiz h2{font-size:19px}
 }
 @media(max-width:350px){.signCard .signPicture{width:82px;height:82px}.signsTabs button{font-size:11px}}
+
+.signRuleMark.warning{color:#ffdf63}.signRuleMark.rescue{color:#6bddad}.signRuleMark.fire,.signRuleMark.ghs{color:#ff7479}
+.signsControls{grid-template-columns:1fr}.signsControls .signsTabs:last-child{width:fit-content}
+@media(max-width:700px){.signsControls .signsTabs:first-child button{flex:1 0 26%}.signsControls .signsTabs:last-child{width:100%}}

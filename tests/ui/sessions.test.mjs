@@ -56,3 +56,21 @@ test('a delayed AI response is ignored after returning to overview',async t=>{
  await act(async()=>{finish(Response.json({score:100,model:'test'}));await pending;});
  assert.equal(saved.length,before);assert.match(text(ui.root),/Dein Lager/);await act(async()=>ui.unmount());
 });
+test('field cards report selectable totals and every canonical topic opens its own pool',async()=>{
+ environment();let ui;await act(async()=>{ui=create(React.createElement(Home))});
+ for(let field=1;field<=12;field++){
+  const card=ui.root.findAllByType('button').find(b=>b.props.className==='fieldCard card'&&b.findAllByType('span').some(n=>n.props.className==='fieldNo'&&text(n)===`LF ${field}`));
+  assert.match(text(card),new RegExp(`${active.filter(q=>q.field===field).length} Aufgaben im Pool`));
+  await act(async()=>card.props.onClick());
+  const topics=[...new Set(active.filter(q=>q.field===field).map(q=>q.topic))];
+  for(const topic of topics){
+   const select=ui.root.findAllByType('select')[1];await act(async()=>select.props.onChange({target:{value:topic}}));
+   const expected=active.filter(q=>q.field===field&&q.topic===topic);
+   assert.match(text(ui.root),new RegExp(`Frage 1 von ${Math.min(20,expected.length)}`));
+   const heading=ui.root.findAllByType('h1').map(text).find(t=>active.some(q=>q.question===t));
+   assert.ok(expected.some(q=>q.question===heading),`LF ${field}: ${topic}`);
+  }
+  await click(ui,'Übersicht');
+ }
+ await act(async()=>ui.unmount());
+});
