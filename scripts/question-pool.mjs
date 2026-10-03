@@ -6,5 +6,6 @@ import { wisoQuestions } from '../app/questions-wiso-v110.js';
 import { createCalculationQuestions } from '../app/data.js';
 import { qualityCheckedQuestions } from '../app/question-quality-filter.js';
 import { finalAuditQuestions } from '../app/question-audit.js';
-export const raw = [...v04Questions,...v05Questions,...v06Questions,...v07Questions,...createCalculationQuestions(20260915),...wisoQuestions];
+import { practicalQuestions } from '../app/questions-practical-2026.js';
+export const raw = [...v04Questions,...v05Questions,...v06Questions,...v07Questions,...createCalculationQuestions(20260915),...practicalQuestions,...wisoQuestions];
 export const active = finalAuditQuestions(qualityCheckedQuestions(raw));
