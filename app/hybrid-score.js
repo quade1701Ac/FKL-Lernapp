@@ -37,7 +37,7 @@ export async function scoreAnswerHybrid(answer,q,fallback){
   let timeout;
   try{
     const controller=new AbortController();
-    timeout=setTimeout(()=>controller.abort(),32000);
+    timeout=setTimeout(()=>controller.abort(),40000);
     const response=await fetch('/api/grade',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -78,7 +78,7 @@ export async function scoreAnswerHybrid(answer,q,fallback){
     };
   }catch(error){
     if(timeout)clearTimeout(timeout);
-    const message=error?.name==='AbortError'?'Zeitüberschreitung nach 32 s':(error?.message||'Netzwerkfehler');
+    const message=error?.name==='AbortError'?'Zeitüberschreitung nach 40 s':(error?.message||'Netzwerkfehler');
     return diag(local,`fehlgeschlagen: ${message}`);
   }
 }
