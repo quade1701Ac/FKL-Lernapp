@@ -8,7 +8,7 @@ function parseLines(raw=''){const text=String(raw).trim();if(!text)return null;c
 const textField={type:'string'};
 const rubricFormat={type:'json_schema',json_schema:{name:'grading_rubric',strict:true,schema:{
  type:'object',additionalProperties:false,required:['criteria','criticalError','confidence'],properties:{
-  criteria:{type:'array',items:{type:'object',additionalProperties:false,required:['label','kind','weight','credit','evidence','reason'],properties:{label:textField,kind:{type:'string',enum:['core','detail']},weight:{type:'integer'},credit:{type:'number',enum:[0,0.5,1]},evidence:textField,reason:textField}}},
+  criteria:{type:'array',items:{type:'object',additionalProperties:false,required:['label','kind','weight','credit','evidence','reason'],properties:{label:textField,kind:{type:'string',enum:['core','detail']},weight:{type:'integer'},credit:{type:'number'},evidence:textField,reason:textField}}},
   criticalError:{anyOf:[{type:'null'},{type:'object',additionalProperties:false,required:['evidence','reason'],properties:{evidence:textField,reason:textField}}]},confidence:{type:'number'}
  }
 }}};
