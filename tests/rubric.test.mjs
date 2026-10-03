@@ -23,7 +23,7 @@ test('dangerous explicit contradiction caps credit; invented evidence is rejecte
  r.criteria[0].evidence='Prüfung durchgeführt';assert.equal(grade(r,answer+' Trotzdem einlagern.'),null);
 });
 test('malformed weights, unsupported credits and excessive detail weighting fail closed',()=>{
- for(const mutate of [r=>r.criteria[0].weight=70,r=>r.criteria[0].credit=0.9,r=>r.criteria[0].kind='detail',r=>r.criteria[0].evidence='',r=>r.criteria[0].reason='']){
+ for(const mutate of [r=>r.criteria[0].weight=70,r=>r.criteria[0].credit=0.9,r=>r.criteria[0].kind='detail',r=>r.criteria[0].evidence='',r=>r.criteria[0].reason='',r=>{r.criteria[0].weight=40;r.criteria[2].weight=40}]){
   const r=rubric();mutate(r);assert.equal(grade(r),null);
  }
  assert.equal(evaluateRubric('not json',answer),null);
