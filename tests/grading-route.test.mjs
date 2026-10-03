@@ -6,7 +6,7 @@ const answer = {question:'Warum hilft eine Testbestellung?',answer:'Die Qualitä
 const provider = content => Response.json({choices:[{message:{content}}]});
 test('provider network failure tries fallback; client count cannot invent an assignment',async t=>{
   const key=process.env.GROQ_API_KEY;process.env.GROQ_API_KEY='test-only';t.after(()=>{if(key===undefined)delete process.env.GROQ_API_KEY;else process.env.GROQ_API_KEY=key;});
-  const calls=[];t.mock.method(globalThis,'fetch',async(url,options)=>{calls.push(JSON.parse(options.body));if(calls.length===1)throw new TypeError('network');return provider('VERDICT: FULL\nREASON: Richtige Begründung.\nCONFIDENCE: 0');});
+  const calls=[];t.mock.method(globalThis,'fetch',async(url,options)=>{calls.push(JSON.parse(options.body));if(calls.length===1)throw new TypeError('network');return provider(JSON.stringify({criteria:[{label:'Qualität vorab prüfen',kind:'core',weight:100,credit:1,evidence:'Qualität vor einem Großauftrag prüfen',reason:'Qualitätsprüfung beschrieben.'}],criticalError:null,confidence:0}));});
   const response=await POST(request({...answer,requestedCount:3})),data=await response.json();
   assert.equal(response.status,200);assert.equal(data.score,100);assert.equal(data.confidence,0);assert.equal(data.requestedCount,null);assert.equal(calls.length,2);assert.notEqual(calls[0].model,calls[1].model);
 });

@@ -20,14 +20,6 @@ function hardZero(answer,local){
   if(NON_ANSWER.test(text)||HOSTILE_NONSENSE.test(text))return true;
   return false;
 }
-function shouldUseAi(local,answer,question){
-  const score=Number(local?.score)||0;
-  const procedure=/\b(wie|vorgehen|schritte|massnahmen|ablauf)\b/.test(normalize(question));
-  // Keyword coverage cannot establish whether a process answer is complete,
-  // correctly sequenced or contradictory. Partial local scores also need review.
-  if(score===100&&!procedure&&!/\b(nicht|kein|keine|ohne|ignorieren)\b/i.test(answer))return false;
-  return true;
-}
 function diag(local,message){
   const label=`⚙️ KI: ${String(message||'unbekannt').slice(0,180)}`;
   return {...local,ai:false,aiStatus:label,hits:[...(local.hits||[])]};
@@ -41,7 +33,6 @@ export async function scoreAnswerHybrid(answer,q,fallback){
   if(normalizedAnswer(answer)&&normalizedAnswer(answer)===normalizedAnswer(q.solution))return {...local,score:100,ai:false,aiStatus:'⚙️ KI: nicht nötig · Referenzantwort'};
   const explicitCount=detectRequestedCount(q?.question||'');
   if(hardZero(answer,local))return {...local,score:0,ai:false,aiStatus:'⚙️ KI: nicht nötig · klare Nullantwort'};
-  if(!shouldUseAi(local,answer,q.question))return diag(local,'lokal eindeutig richtig');
 
   let timeout;
   try{
@@ -73,14 +64,15 @@ export async function scoreAnswerHybrid(answer,q,fallback){
     if(typeof data?.score!=='number'||!Number.isFinite(data.score)||data.score<0||data.score>100)return diag(local,'fehlgeschlagen: ungültiger KI-Score');
 
     const model=String(data.model||'Groq');
-    const aiScore=Math.max(0,Math.min(100,Math.round(Number(data.score)/10)*10));
+    const aiScore=Math.max(0,Math.min(100,Math.round(Number(data.score))));
     const finalScore=aiScore;
     return {
       ...local,
       score:Math.max(0,Math.min(100,finalScore)),
       ai:true,
       aiStatus:`⚙️ KI: aktiv · ${model}`,
-      aiReason:String(data.reason||'').slice(0,240),
+      aiReason:String(data.reason||'').slice(0,1200),
+      criteria:Array.isArray(data.criteria)?data.criteria:[],
       confidence:Number(data.confidence)||0,
       hits:[...(local.hits||[])]
     };
