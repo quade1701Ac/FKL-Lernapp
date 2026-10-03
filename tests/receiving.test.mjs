@@ -20,7 +20,7 @@ test('provider receives process scope as system rule and unchanged learner answe
   assert.match(messages[0].content,/Prozessabschnitt/);
   assert.match(messages[0].content,/Wesentliche Auslassungen/);
   assert.ok(messages[1].content.includes(receivingCases[0].answer));
-  return Response.json({choices:[{message:{content:'VERDICT: FULL\nREASON: Gefragter Abschnitt erfüllt.\nCONFIDENCE: 0.95'}}]});
+  return Response.json({choices:[{message:{content:JSON.stringify({criteria:[{label:'Gefragter Abschnitt',kind:'core',weight:100,credit:1,evidence:receivingCases[0].answer,reason:'Gefragter Abschnitt erfüllt.'}],criticalError:null,confidence:0.95})}}]});
  });
  const response=await POST(new Request('http://localhost/api/grade',{method:'POST',body:JSON.stringify({...receivingQuestion,answer:receivingCases[0].answer})}));
  assert.equal(response.status,200);assert.equal((await response.json()).score,100);
