@@ -7,6 +7,8 @@ const cases=[
  {name:'Vollständige Klärung',question,solution,answer:'Ich stoppe die reguläre Annahme, gleiche die Lieferunterlagen ab und kläre mit dem Lieferanten, ob die Sendung fehlgeleitet wurde oder nur die Papiere falsch sind. Bis dahin kommt sie nicht in den normalen Bestand.',min:90,max:100},
  {name:'Falsche Freigabe',question,solution,answer:'Die Menge stimmt, deshalb lagere ich die Ware trotzdem direkt in den normalen Bestand ein und ignoriere den falschen Empfänger.',min:0,max:20},
  {name:'Sinngemäße Kurzantwort',question:'Warum ist ein Sicherheitsbestand sinnvoll?',solution:'Er puffert unerwartete Lieferverzögerungen oder Bedarfsschwankungen ab.',answer:'Damit bei einer verspäteten Lieferung die Ware nicht gleich ausgeht.',min:90,max:100},
+ {name:'Freie Zeichenbedeutung sinngemäß',question:'Welche Bedeutung hat dieses abgebildete Zeichen? Nenne die Bedeutung; eine zusätzliche Beschreibung der Form oder Farbe ist nicht erforderlich.',solution:'Augenschutz benutzen',answer:'Hier ist eine Schutzbrille zu tragen.',min:90,max:100},
+ {name:'Verbotszeichen nicht umkehren',question:'Welche Bedeutung hat dieses abgebildete Zeichen? Nenne die Bedeutung; eine zusätzliche Beschreibung der Form oder Farbe ist nicht erforderlich.',solution:'Rauchen verboten',answer:'Hier ist Rauchen erlaubt.',min:0,max:20},
  {name:'Zwei von drei Aufzählungspunkten',question:'Nenne drei verschiedene persönliche Schutzausrüstungen.',solution:'Schutzhelm, Sicherheitsschuhe und Schutzhandschuhe.',answer:'Schutzhelm und Sicherheitsschuhe',min:67,max:67}
 ];
 async function grade(sample){
