@@ -22,3 +22,16 @@ test('invalid request types are rejected before contacting provider',async t=>{
   assert.equal((await POST(request({...answer,keywords:{bad:true}}))).status,400);
   assert.equal((await POST(request({...answer,answer:'x'.repeat(6001)}))).status,400);
 });
+test('deductions receive a separate scope audit before being returned',async t=>{
+ const key=process.env.GROQ_API_KEY;process.env.GROQ_API_KEY='test-only';t.after(()=>{if(key===undefined)delete process.env.GROQ_API_KEY;else process.env.GROQ_API_KEY=key;});
+ let calls=0;t.mock.method(globalThis,'fetch',async(url,options)=>{
+  calls++;const body=JSON.parse(options.body);
+  if(calls===2)assert.match(body.messages[1].content,/Zulässigkeit der Abzüge/);
+  const criteria=calls===1?[
+   {label:'Qualität prüfen',kind:'core',weight:80,credit:1,evidence:'Qualität',reason:'Richtig.'},
+   {label:'Dokumentieren',kind:'detail',weight:20,credit:0,evidence:'',reason:'Dokumentation fehlt.'}
+  ]:[{label:'Qualität prüfen',kind:'core',weight:100,credit:1,evidence:'Qualität',reason:'Richtige Begründung.'}];
+  return provider(JSON.stringify({criteria,criticalError:null,confidence:0.9}));
+ });
+ const result=await POST(request(answer));assert.equal(result.status,200);assert.equal((await result.json()).score,100);assert.equal(calls,2);
+});

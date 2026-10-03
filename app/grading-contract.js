@@ -38,7 +38,7 @@ export function parseLocalizedNumber(value = '') {
 
 export const RUBRIC_RULES = `Antworte als reines JSON:
 {"criteria":[{"label":"notwendiger Punkt","kind":"core|detail","weight":80,"credit":1,"evidence":"wörtlicher Ausschnitt aus der Antwort","reason":"was erfüllt ist oder konkret fehlt"}],"criticalError":null,"confidence":0.9}
-- 1 bis 6 Kriterien, Gewichte zusammen exakt 100. Kernkriterien (core) zusammen mindestens 60 Punkte. Ergänzende notwendige Einzelheiten (detail) jeweils höchstens 20 Punkte. Keine optionalen Lerntipps als Kriterien.
+- 1 bis 6 Kriterien, Gewichte zusammen exakt 100. Kernkriterien (core) zusammen mindestens 80 Punkte. Alle ergänzenden notwendigen Details zusammen höchstens 20 Punkte. Ergänzende notwendige Einzelheiten (detail) jeweils höchstens 20 Punkte. Keine optionalen Lerntipps als Kriterien.
 - credit: 1 = erfüllt, 0.5 = teilweise erfüllt, 0 = fehlt oder falsch. Gewichtung vor Bewertung festlegen. Kürze, Rechtschreibung und fehlende Pflichtwörter sind kein Fehler.
 - Für jede Anerkennung evidence als wörtliches Zitat aus der Schülerantwort angeben; bei credit 0 darf evidence leer sein. reason benennt konkret Erfülltes oder Fehlendes.
 - Erkennbare Prüfungen nicht doppelt verlangen: Wer die andere Niederlassung erkennt, hat den Empfänger bereits abgeglichen. Nicht regulär annehmen und Lieferanten informieren erfüllt bei unklarer Zuordnung den Kern der Absicherung und Klärung. Die pauschale Behauptung, die Ware sei definitiv falsch geliefert, kann eine kleine Lücke sein, weil auch ein Papierfehler möglich ist.
@@ -64,7 +64,7 @@ export function evaluateRubric(raw, answer) {
     earned += points;
     criteria.push({label:c.label,weight:c.weight,points,reason:c.reason});
   }
-  if (total !== 100 || core < 60) return null;
+  if (total !== 100 || core < 80) return null;
   let score = Math.round(earned);
   if (data.criticalError != null) {
     if (!contains(data.criticalError.evidence) || typeof data.criticalError.reason !== 'string' || !data.criticalError.reason.trim() || data.criticalError.reason.length > 400) return null;
