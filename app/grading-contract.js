@@ -80,6 +80,9 @@ export function evaluateRubric(raw, answer, fixed = null) {
 // but cannot invent extra requirements or change the weights.
 export function fixedRubric(question, mode) {
   const q=normalizedAnswer(question);
+  if(q==='welche bedeutung hat dieses abgebildete zeichen nenne die bedeutung eine zusatzliche beschreibung der form oder farbe ist nicht erforderlich')return [
+    {label:'Bedeutung des Zeichens sinngemäß richtig nennen',kind:'core',weight:100}
+  ];
   if(q==='eine lieferung trifft mit korrekter packstuckzahl ein aber der empfanger auf den papieren ist eine andere niederlassung wie gehst du vor')return [
     {label:'Ungeklärte Ware nicht regulär annehmen oder einlagern',kind:'core',weight:50},
     {label:'Klärung mit Lieferant oder zuständiger Stelle anstoßen',kind:'core',weight:30},

@@ -38,3 +38,11 @@ test('teacher criteria prevent invented process requirements and alternative cau
  assert.equal(fixedRubric('Warum ist ein Sicherheitsbestand sinnvoll?','explanation').length,1);
  assert.equal(fixedRubric('Warum ist ein Sicherheitsbestand sinnvoll und welche Kosten entstehen?','explanation'),null);
 });
+test('sign meaning uses one teacher criterion and cannot require additional shape or color details',()=>{
+ const question='Welche Bedeutung hat dieses abgebildete Zeichen? Nenne die Bedeutung; eine zusätzliche Beschreibung der Form oder Farbe ist nicht erforderlich.';
+ const fixed=fixedRubric(question,'open');assert.equal(fixed.length,1);assert.equal(fixed[0].weight,100);
+ const r={criteria:[{...fixed[0],credit:1,evidence:'Schutzbrille tragen',reason:'Augenschutz erkannt.'}],criticalError:null,confidence:.99};
+ assert.equal(evaluateRubric(JSON.stringify(r),'Schutzbrille tragen',fixed).score,100);
+ r.criteria[0].credit=0;r.criteria[0].evidence='';r.criteria[0].reason='Rauchverbot wird als Erlaubnis umgekehrt.';
+ assert.equal(evaluateRubric(JSON.stringify(r),'Hier ist Rauchen erlaubt.',fixed).score,0);
+});

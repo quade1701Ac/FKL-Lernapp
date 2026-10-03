@@ -44,3 +44,5 @@ Tests prüfen Erreichbarkeit aller neuen Aufgaben, Themenzuordnung und Poolstabi
 Zusätzliche Primärquelle für die Zeichenarten und Gestaltungsgrundsätze: DGUV Information 211-041, https://www.bghm.de/fileadmin/user_upload/Arbeitsschuetzer/Gesetze_Vorschriften/Informationen/211-041.pdf .
 
 Ausbau-Tests: freie Bedeutung mit abweichender Formulierung, Persistenz und Kontentrennung, falsche/übersprungene Zeichen, Ausfall und verspätete Bewertung, alle fünf Form-/Farbenaufgaben, direkter Einstieg, gezielte Fragerunde und komplette Bearbeitung aller drei Praxisfälle. Zwei zusätzliche reale API-Releasechecks prüfen sinngemäßen Augenschutz und die falsche Umkehrung eines Rauchverbots.
+
+Für die freie Zeichenbedeutung gilt ein festes Ein-Kriterium-Schema mit 100 Kernpunkten. Die KI prüft weiterhin sinngemäße Formulierungen; sie darf keine Form-/Farbkenntnisse oder Zusatzhandlungen verlangen. Dieser eng begrenzte Auftrag vermeidet die zusätzliche offene Abzugsprüfung. Die Livechecks verlangen ausdrücklich dieses Kriterium, damit die neue Serverversion nachgewiesen wird.

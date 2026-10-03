@@ -35,3 +35,9 @@ test('deductions receive a separate scope audit before being returned',async t=>
  });
  const result=await POST(request(answer));assert.equal(result.status,200);assert.equal((await result.json()).score,100);assert.equal(calls,2);
 });
+test('wrong sign meaning is rejected within fixed scope without a duplicate deduction audit',async t=>{
+ const key=process.env.GROQ_API_KEY;process.env.GROQ_API_KEY='test-only';t.after(()=>{if(key===undefined)delete process.env.GROQ_API_KEY;else process.env.GROQ_API_KEY=key;});
+ let calls=0;t.mock.method(globalThis,'fetch',async()=>{calls++;return provider(JSON.stringify({criteria:[{label:'Bedeutung des Zeichens sinngemäß richtig nennen',kind:'core',weight:100,credit:0,evidence:'',reason:'Rauchverbot wird als Erlaubnis umgekehrt.'}],criticalError:null,confidence:.99}))});
+ const response=await POST(request({question:'Welche Bedeutung hat dieses abgebildete Zeichen? Nenne die Bedeutung; eine zusätzliche Beschreibung der Form oder Farbe ist nicht erforderlich.',solution:'Rauchen verboten',answer:'Hier ist Rauchen erlaubt.',keywords:['Rauchen','verboten']}));
+ assert.equal(response.status,200);const data=await response.json();assert.equal(data.score,0);assert.equal(calls,1);assert.equal(data.criteria[0].weight,100);
+});
