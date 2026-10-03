@@ -87,7 +87,7 @@ export const safetySigns = [
 
 export function signImage(code){
   const ghsFiles={GHS01:'GHS-pictogram-explos.svg',GHS02:'GHS-pictogram-flamme.svg',GHS03:'GHS-pictogram-rondflam.svg',GHS04:'GHS-pictogram-bottle.svg',GHS05:'GHS-pictogram-acid.svg',GHS06:'GHS-pictogram-skull.svg',GHS07:'GHS-pictogram-exclam.svg',GHS08:'GHS-pictogram-silhouette.svg',GHS09:'GHS-pictogram-pollu.svg'};
-  const filename=ghsFiles[code]|| (code.startsWith('D-')?`DIN_4844-2_${code}.svg`:
+  const filename=ghsFiles[code]|| (code==='E003'?'ISO_7010_E003_-_First_aid_sign.svg':code.startsWith('D-')?`DIN_4844-2_${code}.svg`:
     code==='WSP001'?'ISO_7010_P048.svg':
     code==='WSM001'?'ISO_7010_M053;_mandatory;_wear_personal_floatation_device_(PFD)_(lifejacket).svg':`ISO_7010_${code}.svg`);
   return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
