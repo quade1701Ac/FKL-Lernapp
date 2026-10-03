@@ -28,3 +28,13 @@ test('malformed weights, unsupported credits and excessive detail weighting fail
  }
  assert.equal(evaluateRubric('not json',answer),null);
 });
+
+import {fixedRubric} from '../app/grading-contract.js';
+test('teacher criteria prevent invented process requirements and alternative causes',()=>{
+ const q='Eine Lieferung trifft mit korrekter Packstückzahl ein, aber der Empfänger auf den Papieren ist eine andere Niederlassung. Wie gehst du vor?';
+ const fixed=fixedRubric(q,'procedure');assert.deepEqual(fixed.map(c=>c.weight),[50,30,20]);
+ const r=rubric();r.criteria.forEach((c,i)=>Object.assign(c,fixed[i]));assert.equal(evaluateRubric(JSON.stringify(r),answer,fixed).score,80);
+ r.criteria[0].label='Lieferunterlagen ausdrücklich erneut prüfen';assert.equal(evaluateRubric(JSON.stringify(r),answer,fixed),null);
+ assert.equal(fixedRubric('Warum ist ein Sicherheitsbestand sinnvoll?','explanation').length,1);
+ assert.equal(fixedRubric('Warum ist ein Sicherheitsbestand sinnvoll und welche Kosten entstehen?','explanation'),null);
+});

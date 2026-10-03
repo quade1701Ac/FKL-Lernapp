@@ -47,7 +47,7 @@ export const RUBRIC_RULES = `Antworte als reines JSON:
 
 // The server computes credit, validates evidence and rejects malformed rubrics.
 // The model cannot supply an arbitrary final percentage.
-export function evaluateRubric(raw, answer) {
+export function evaluateRubric(raw, answer, fixed = null) {
   let data;
   try { data = JSON.parse(String(raw)); } catch { return null; }
   if (!data || !Array.isArray(data.criteria) || data.criteria.length < 1 || data.criteria.length > 6) return null;
@@ -65,6 +65,7 @@ export function evaluateRubric(raw, answer) {
     criteria.push({label:c.label,weight:c.weight,points,reason:c.reason});
   }
   if (total !== 100 || core < 80) return null;
+  if (fixed && (data.criteria.length !== fixed.length || data.criteria.some((c,i) => c.label !== fixed[i].label || c.kind !== fixed[i].kind || c.weight !== fixed[i].weight))) return null;
   let score = Math.round(earned);
   if (data.criticalError != null) {
     if (!contains(data.criticalError.evidence) || typeof data.criticalError.reason !== 'string' || !data.criticalError.reason.trim() || data.criticalError.reason.length > 400) return null;
@@ -73,4 +74,19 @@ export function evaluateRubric(raw, answer) {
   const deductions = criteria.filter(c => c.points < c.weight).map(c => `${c.reason} (−${c.weight-c.points} Punkte)`);
   const reason = data.criticalError ? `${data.criticalError.reason} Bewertung auf höchstens 20 % begrenzt.` : deductions.length ? deductions.join(' ') : 'Alle notwendigen Punkte sind sinngemäß erfüllt.';
   return {score,criteria,reason,confidence:data.confidence};
+}
+
+// Teacher-defined criteria for ambiguous cases; the AI evaluates their evidence,
+// but cannot invent extra requirements or change the weights.
+export function fixedRubric(question, mode) {
+  const q=normalizedAnswer(question);
+  if(q==='eine lieferung trifft mit korrekter packstuckzahl ein aber der empfanger auf den papieren ist eine andere niederlassung wie gehst du vor')return [
+    {label:'Ungeklärte Ware nicht regulär annehmen oder einlagern',kind:'core',weight:50},
+    {label:'Klärung mit Lieferant oder zuständiger Stelle anstoßen',kind:'core',weight:30},
+    {label:'Fehlzustellung und falsche Lieferpapiere als mögliche Ursachen klären',kind:'detail',weight:20}
+  ];
+  if(mode==='explanation' && /^warum\b|^weshalb\b|^wieso\b/.test(q) && !/\bund\b|\b(?:zwei|drei|vier|ursachen|grunde|faktoren)\b/.test(q))return [
+    {label:'Eine fachlich richtige und ausreichende Ursache oder Wirkung erklären',kind:'core',weight:100}
+  ];
+  return null;
 }

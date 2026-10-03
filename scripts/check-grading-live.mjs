@@ -11,12 +11,12 @@ const cases=[
 ];
 async function grade(sample){
  const response=await fetch(`${base}/api/grade`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sample),signal:AbortSignal.timeout(22000)});
- if(!response.ok)throw new Error(`Grading HTTP ${response.status}`);
+ if(!response.ok)throw new Error(`Grading HTTP ${response.status}: ${JSON.stringify(await response.json())}`);
  return response.json();
 }
 let first;
 for(let attempt=0;attempt<12;attempt++){
- try{const result=await grade(cases[0]);if(result.gradingVersion==='weighted-v2'){first=result;break;}}catch(error){console.log(`Deployment noch nicht erreichbar: ${error.message}`);}
+ try{const result=await grade(cases[0]);if(result.gradingVersion==='weighted-v3'){first=result;break;}}catch(error){console.log(`Deployment noch nicht erreichbar: ${error.message}`);}
  await new Promise(resolve=>setTimeout(resolve,15000));
 }
 if(!first)throw new Error('Aktuelle Bewertungsversion wurde nicht rechtzeitig veröffentlicht.');
@@ -24,7 +24,7 @@ let failures=0;
 for(let i=0;i<cases.length;i++){
  const sample=cases[i],result=i===0?first:await grade(sample);
  const passed=result.score>=sample.min&&result.score<=sample.max;
- console.log(JSON.stringify({case:sample.name,passed,score:result.score,reason:result.reason}));
+ console.log(JSON.stringify({case:sample.name,passed,score:result.score,reason:result.reason,model:result.model}));
  if(!passed)failures++;
 }
 if(failures)throw new Error(`${failures} echte KI-Bewertungen außerhalb des erwarteten Bereichs.`);
