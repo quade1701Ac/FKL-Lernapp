@@ -16,7 +16,7 @@ async function grade(sample){
 }
 let first;
 for(let attempt=0;attempt<12;attempt++){
- try{const result=await grade(cases[0]);if(result.gradingVersion==='weighted-v1'){first=result;break;}}catch(error){console.log(`Deployment noch nicht erreichbar: ${error.message}`);}
+ try{const result=await grade(cases[0]);if(result.gradingVersion==='weighted-v2'){first=result;break;}}catch(error){console.log(`Deployment noch nicht erreichbar: ${error.message}`);}
  await new Promise(resolve=>setTimeout(resolve,15000));
 }
 if(!first)throw new Error('Aktuelle Bewertungsversion wurde nicht rechtzeitig veröffentlicht.');
