@@ -3,7 +3,6 @@ import {useState} from 'react';
 import {safetySigns,signImage,shuffledSigns,signOptions} from './safety-sign-data';
 import './safety-signs.css';
 
-const FOCUS=new Set(['M003','M004','M013','M017','M023']);
 const sources={mandatory:'https://www.bghm.de/arbeitsschuetzer/praxishilfen/sicherheitszeichen/gebotszeichen',prohibited:'https://www.bghm.de/arbeitsschuetzer/praxishilfen/sicherheitszeichen/verbotszeichen'};
 
 function SignPicture({sign}){
@@ -22,10 +21,10 @@ export default function SafetySigns({onClose}){
  function start(){const picked=shuffledSigns(pool).slice(0,Math.min(10,pool.length));setQuestions(picked);setIndex(0);setCorrect(0);setSelected(null);setOptions(signOptions(picked[0],pool));setMode('quiz')}
  function next(){if(index+1>=questions.length){setMode('result');return}const nextSign=questions[index+1];setIndex(index+1);setOptions(signOptions(nextSign,pool));setSelected(null)}
  return <section className="signsShell">
-  <header className="signsHead"><div><span className="kicker">PRÜFUNGSVORBEREITUNG · ARBEITSSCHUTZ</span><h1>Gebots- & Verbotszeichen</h1><p>Zeichen ansehen, Bedeutung einprägen und ohne eingeblendete Lösung abfragen.</p></div><button className="secondary" onClick={onClose}>← Praxiswelt</button></header>
+  <header className="signsHead"><div><span className="kicker">ARBEITSSCHUTZ</span><h1>Gebots- & Verbotszeichen</h1><p>Erst das Bild ansehen, dann die Bedeutung aufdecken oder dein Wissen testen.</p></div><button className="secondary" onClick={onClose}>← Praxiswelt</button></header>
   <div className="signsRule"><div><span className="signRuleMark mandatory">●</span><strong>Gebot</strong><small>Rund · blau · etwas muss getan werden</small></div><div><span className="signRuleMark prohibited">⊘</span><strong>Verbot</strong><small>Rund · rot mit Schrägbalken · etwas ist untersagt</small></div></div>
   <div className="signsControls"><div className="signsTabs" role="group" aria-label="Zeichenart">{[['all','Alle'],['mandatory','Gebotszeichen'],['prohibited','Verbotszeichen']].map(([id,label])=><button key={id} className={kind===id?'active':''} onClick={()=>{setKind(id);setMode('catalog')}}>{label}</button>)}</div><div className="signsTabs" role="group" aria-label="Lernart"><button className={mode==='catalog'?'active':''} onClick={()=>setMode('catalog')}>Übersicht</button><button className={mode==='quiz'||mode==='result'?'active':''} onClick={start}>10 Zeichen abfragen</button></div></div>
-  {mode==='catalog'&&<><label className="signsSearch">Zeichen suchen <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="z. B. M023 oder Atemschutz"/></label><p className="signsCount">{visible.length} Zeichen · Tippe auf ein Zeichen, um die Bedeutung aufzudecken.</p><div className="signsGrid">{visible.map(sign=><SignCard key={sign.code} sign={sign}/>)}</div>{!visible.length&&<p>Kein passendes Zeichen gefunden.</p>}</>}
+  {mode==='catalog'&&<><label className="signsSearch">Zeichen suchen <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Code oder Bedeutung eingeben"/></label><p className="signsCount">{visible.length} Zeichen · Karte antippen und Bedeutung aufdecken</p><div className="signsGrid">{visible.map(sign=><SignCard key={sign.code} sign={sign}/>)}</div>{!visible.length&&<p>Kein passendes Zeichen gefunden.</p>}</>}
   {mode==='quiz'&&current&&<div className="signQuiz card"><div className="signQuizTop"><span>Frage {index+1} von {questions.length}</span><strong>{correct} richtig</strong></div><SignPicture key={current.code} sign={current}/><h2>Was bedeutet dieses Zeichen?</h2><div className="signQuizOptions">{options.map(option=><button key={option.code} disabled={selected!==null} className={selected!==null?(option.code===current.code?'right':selected===option.code?'wrong':''):''} onClick={()=>{setSelected(option.code);if(option.code===current.code)setCorrect(n=>n+1)}}>{option.label}</button>)}</div>{selected!==null&&<div className="signQuizFeedback" role="status"><b>{selected===current.code?'Richtig!':'Noch nicht ganz.'}</b> {current.code} · {current.label}<button className="primary" onClick={next}>{index+1===questions.length?'Ergebnis ansehen':'Nächstes Zeichen'}</button></div>}</div>}
   {mode==='result'&&<div className="signQuiz card"><h2>{correct} von {questions.length} richtig</h2><p>{correct===questions.length?'Alle Zeichen erkannt!': 'Schau dir die Zeichen noch einmal an und starte eine neue Runde.'}</p><div className="signResultActions"><button className="primary" onClick={start}>Neue Runde</button><button className="secondary" onClick={()=>setMode('catalog')}>Alle Zeichen ansehen</button></div></div>}
   <p className="signsSources">Bezeichnungen: <a href={sources.mandatory} target="_blank" rel="noreferrer">BGHM Gebotszeichen</a> · <a href={sources.prohibited} target="_blank" rel="noreferrer">BGHM Verbotszeichen</a>. Piktogramme: Wikimedia Commons; für die Anzeige ist eine Internetverbindung erforderlich.</p>
@@ -35,6 +34,6 @@ export default function SafetySigns({onClose}){
 function SignCard({sign}){
  const [open,setOpen]=useState(false);
  return <button className={`signCard ${open?'revealed':''}`} onClick={()=>setOpen(v=>!v)} aria-expanded={open}>
-  <SignPicture sign={sign}/><span className="signCode">{open?sign.code:'Bedeutung?'}</span><strong>{open?sign.label:'Antippen zum Aufdecken'}</strong>{FOCUS.has(sign.code)&&<small>Prüfungsfokus</small>}
+  <SignPicture sign={sign}/><span className="signCode">{open?sign.code:'Was bedeutet das?'}</span><strong>{open?sign.label:'Aufdecken'}</strong>
  </button>;
 }
