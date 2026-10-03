@@ -25,3 +25,10 @@ test('clear nonanswers stay local and malformed AI scores fall back',async t=>{
   const result=await scoreAnswerHybrid('Zunächst die Qualität erproben',q);
   assert.equal(result.ai,false);assert.match(result.aiStatus,/ungültiger KI-Score/);
 });
+
+test('keyword matches cannot bypass semantic review; exact thirds keep their percentage',async t=>{
+  let calls=0;t.mock.method(globalThis,'fetch',async()=>{calls++;return Response.json({score:67,model:'test'});});
+  const q={type:'free',question:'Nenne drei Maßnahmen.',solution:'Prüfen, dokumentieren und melden.',keywords:['prüfen','dokumentieren','melden'],minHits:3};
+  const result=await scoreAnswerHybrid('Prüfen, dokumentieren, melden',q);
+  assert.equal(calls,1);assert.equal(result.score,67);
+});
