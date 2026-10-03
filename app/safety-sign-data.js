@@ -35,7 +35,7 @@ const prohibited = [
 
 export const signKinds = [
  {id:'mandatory',label:'Gebote',name:'Gebot',mark:'●',rule:'Blauer Kreis · vorgeschriebene Handlung'},
- {id:'prohibited',label:'Verbote',name:'Verbot',mark:'⊘',rule:'Roter Kreis mit Schrägbalken · untersagte Handlung'},
+ {id:'prohibited',label:'Verbote',name:'Verbot',mark:'⊘',rule:'Weiße Grundfläche · roter Rand und Schrägbalken · untersagte Handlung'},
  {id:'warning',label:'Warnung',name:'Warnung',mark:'▲',rule:'Gelbes Dreieck · Gefahr beachten'},
  {id:'rescue',label:'Rettung',name:'Rettung',mark:'✚',rule:'Grünes Quadrat oder Rechteck · Fluchtweg oder Hilfe'},
  {id:'fire',label:'Brandschutz',name:'Brandschutz',mark:'▣',rule:'Rotes Quadrat oder Rechteck · Brandbekämpfung'},
